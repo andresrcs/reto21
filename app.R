@@ -10,40 +10,101 @@ ui <- navbarPage(title = "RETO-21",
 server <- function(input, output, session) {
     # Update functions #########################################################
     update_listas_retos <- function() {
-        updateSelectInput(session = session,
-                          inputId = "reto_actividad",
-                          choices = c("", get_retos() %>%
-                                          filter(reto_activo) %>%
-                                          pull(nombre_reto)))
+        
+        lista_retos <- get_retos() %>%
+            filter(reto_activo) %>%
+            pull(nombre_reto)
+        
+        lista_retos_named <- get_retos() %>%
+            filter(reto_activo) %>% 
+            mutate(lista = id_reto %>% setNames(nombre_reto)) %>% 
+            pull(lista)
         
         updateSelectInput(session = session,
+                          inputId = "reto_participacion",
+                          choices = c("", lista_retos))
+
+        updateSelectInput(session = session,
                           inputId = "reto_parametros",
-                          choices = c("", get_retos() %>%
-                                          filter(reto_activo) %>%
-                                          pull(nombre_reto)))
+                          choices = c("", lista_retos))
         
         updateSelectInput(session = session,
                           inputId = "reto_habito",
-                          choices = c("", get_retos() %>%
-                                          filter(reto_activo) %>%
-                                          pull(nombre_reto)))
+                          choices = c("", lista_retos))
         
         updateSelectInput(session = session,
                           inputId = "reto_reg_actividad",
-                          choices = c("", get_retos() %>%
-                                          filter(reto_activo) %>%
-                                          pull(nombre_reto)))
+                          choices = c("", lista_retos))
+        
+        updateSelectInput(session = session,
+                          inputId = "reto_foto",
+                          choices = c("", lista_retos))
+        
+        updateSelectInput(session = session,
+                          inputId = "reto_calificacion",
+                          choices = c("", lista_retos))
+        
+        updateSelectInput(session = session,
+                          inputId = "reto_resultados",
+                          choices = c("", lista_retos))
+        
+        updateSelectInput(session = session,
+                          inputId = "reto_actividad",
+                          choices = c("", lista_retos))
         
         updateCheckboxGroupInput(session = session,
                                  inputId = "calendarId",
-                                 choices = get_retos() %>%
-                                     filter(reto_activo) %>% 
-                                     mutate(lista = id_reto %>% setNames(nombre_reto)) %>% 
-                                     pull(lista),
-                                 selected = get_retos() %>%
-                                     filter(reto_activo) %>% 
-                                     mutate(lista = id_reto %>% setNames(nombre_reto)) %>% 
-                                     pull(lista))
+                                 choices = lista_retos_named,
+                                 selected = lista_retos_named)
+    }
+    
+    update_lista_coaches <- function() {
+        coach_expositor.Types(
+            get_coaches() %>%
+                filter(permiso != 'Inactivo') %>%
+                pull(nombre_coach)
+        )
+    }
+    
+    update_listas_retadores <- function() {
+        nombre_retador.Types(if (isolate(credentials()$info$permiso) != 'Administrador') {
+            get_retadores() %>%
+                filter(nombre_coach == isolate(credentials()$info$nombre_coach)) %>%
+                pull(nombre_retador)
+        } else {
+            get_retadores() %>%
+                pull(nombre_retador)
+        })
+        
+        updateSelectInput(session = session,
+                          'reto_parametros',
+                          selected = ""
+        )
+        
+        updateSelectInput(session = session,
+                          'reto_habito',
+                          selected = ""
+        )
+        
+        updateSelectInput(session = session,
+                          'reto_actividades',
+                          selected = ""
+        )
+        
+        updateSelectInput(session = session,
+                          'reto_foto',
+                          selected = ""
+        )
+        
+        updateSelectInput(session = session,
+                          'reto_calificacion',
+                          selected = ""
+        )
+        
+        updateSelectInput(session = session,
+                          'reto_resultados',
+                          selected = ""
+        )
     }
     
     update_resumen <- function() {
@@ -213,7 +274,7 @@ server <- function(input, output, session) {
                 stop(paste(cond))
             }
         )
-        
+        update_lista_coaches()
         return(get_coaches())
     }
     
@@ -231,7 +292,7 @@ server <- function(input, output, session) {
                 stop(paste(cond))
             }
         )
-        
+        update_lista_coaches()
         return(get_coaches())
     }
     
@@ -259,7 +320,7 @@ server <- function(input, output, session) {
                 stop(paste(cond))
             }
         )
-        
+        update_lista_coaches()
         return(get_coaches())
     }
     
@@ -354,7 +415,7 @@ server <- function(input, output, session) {
             updateTextInput(session, inputId = "num_celular_coach", value = datos_coach$num_celular_coach)
             updateTextInput(session, inputId = "email_coach", value = datos_coach$email_coach)
             updateCheckboxInput(session, inputId = "notificacion_correo", value = datos_coach$notificacion_correo)
-           
+            update_lista_coaches()
             showNotification("Modificaciones guardadas", duration = 3, closeButton = TRUE, type = "message")
         }
     })
@@ -365,7 +426,7 @@ server <- function(input, output, session) {
           SELECT *
           FROM
             tbl_retadores
-          ORDER BY id_retador DESC"
+          ORDER BY nombre_retador"
         res <- dbGetQuery(con, consulta_sql)
         return(res)
     }
@@ -394,7 +455,7 @@ server <- function(input, output, session) {
                 stop(paste(cond))
             }
         )
-        
+        update_listas_retadores()
         return(get_retadores())
     }
     
@@ -416,7 +477,7 @@ server <- function(input, output, session) {
                 stop(paste(cond))
             }
         )
-        
+        update_listas_retadores()
         return(get_retadores())
     }
     
@@ -446,7 +507,7 @@ server <- function(input, output, session) {
                 stop(paste(cond))
             }
         )
-        
+        update_listas_retadores()
         return(get_retadores())
     }
     
@@ -675,6 +736,12 @@ server <- function(input, output, session) {
                    stringsAsFactors=FALSE)
     ) 
     
+    coach_expositor.Types <- reactiveVal(
+        get_coaches() %>%
+            filter(permiso != 'Inactivo') %>%
+            pull(nombre_coach)
+    )
+    
     tbl_actividades(get_actividades(reto = isolate(input$reto_actividad)))
     
     actividades_result <- dtedit(input, output,
@@ -688,11 +755,10 @@ server <- function(input, output, session) {
                                              'inicio' = 'datetimeInput',
                                              'duracion' = 'numericInput',
                                              'tema_actividad' = 'textAreaInput',
-                                             'coach_expositor' = 'selectInput'),
+                                             'coach_expositor' = 'selectInputReactive'),
                              input.choices = list('actividad' = enum$valor[enum$variable == 'tipo_actividad'],
-                                                  'coach_expositor' = get_coaches() %>%
-                                                      filter(permiso != 'Inactivo') %>%
-                                                      pull(nombre_coach)),
+                                                  'coach_expositor' = 'coach_expositor.Types.list'),
+                             input.choices.reactive = list(coach_expositor.Types.list = coach_expositor.Types),
                              view.cols = c('actividad', 'inicio_mostrar', 'fin_mostrar',
                                            'coach_expositor'),
                              delete.info.label.cols = c('Tipo', 'Inicio', 'Fin',
@@ -758,6 +824,7 @@ server <- function(input, output, session) {
                 stop(paste(cond))
             }
         )
+        update_listas_retadores()
         return(get_participaciones(reto = isolate(input$reto_participacion)))
     }
     
@@ -779,6 +846,7 @@ server <- function(input, output, session) {
                 stop(paste(cond))
             }
         )
+        update_listas_retadores()
         return(get_participaciones(reto = isolate(input$reto_participacion)))
     }
     
@@ -802,6 +870,7 @@ server <- function(input, output, session) {
                 stop(paste(cond))
             }
         )
+        update_listas_retadores()
         return(get_participaciones(reto = isolate(input$reto_participacion)))
     }
     
@@ -814,6 +883,11 @@ server <- function(input, output, session) {
                    stringsAsFactors=FALSE)
     ) 
     
+    nombre_retador.Types <- reactiveVal(
+            get_retadores() %>%
+                pull(nombre_retador)
+    )
+    
     tbl_participaciones(get_participaciones(reto = isolate(input$reto_participacion)))
     
     participaciones_result <- dtedit(input, output,
@@ -821,16 +895,10 @@ server <- function(input, output, session) {
                              thedata = tbl_participaciones,
                              edit.cols = c('nombre_retador', 'objetivo_participacion'),
                              edit.label.cols = c('Retador','Objetivo'),
-                             input.types = c('nombre_retador' = 'selectInput',
+                             input.types = c('nombre_retador' = 'selectInputReactive',
                                              'objetivo_participacion' = 'textAreaInput'),
-                             input.choices = list('nombre_retador' = if (credentials()$info$permiso != 'Administrador') {
-                                 get_retadores() %>%
-                                     filter(nombre_coach == credentials()$info$nombre_coach) %>%
-                                     pull(nombre_retador)
-                             } else {
-                                 get_retadores() %>%
-                                     pull(nombre_retador)
-                             }),
+                             input.choices = list('nombre_retador' = 'nombre_retador.Types.list'),
+                             input.choices.reactive = list(nombre_retador.Types.list = nombre_retador.Types),
                              view.cols = c('nombre_retador', 'num_celular_retador', 'nombre_coach'),
                              delete.info.label.cols = c('Retador', 'Celular', 'Coach'),
                              show.copy = FALSE, 
@@ -865,8 +933,9 @@ server <- function(input, output, session) {
     )
     
     observeEvent(input$reto_participacion, {
-        req(input$reto_participacion)
+        #req(input$reto_participacion)
         tbl_participaciones(get_participaciones(reto = input$reto_participacion))
+        update_listas_retadores()
     })
     # Tab Parametros ###########################################################
     get_parametros <- function (id_participacion) {

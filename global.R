@@ -30,9 +30,11 @@ dbSendStatement(con, "SET search_path = reto21")
 
 get_coaches <- function() {
     consulta_sql <- "
-          SELECT *
-          FROM
-            tbl_coaches"
+        SELECT *
+        FROM
+            tbl_coaches
+        ORDER BY nombre_coach
+        "
     res <- dbGetQuery(con, consulta_sql) %>%
         mutate(across(starts_with("notificacion"), ~ as.logical(as.numeric(.))))
     return(res)
@@ -110,7 +112,8 @@ get_participaciones <- function(reto) {
         FROM
             tbl_participacion tp INNER JOIN tbl_retadores tr ON tp.nombre_retador = tr.nombre_retador
         WHERE
-            nombre_reto = {reto}", .con = con)
+            nombre_reto = {reto}
+        ORDER BY tp.nombre_retador", .con = con)
     res <- dbGetQuery(con, consulta_sql)
     return(res)
 }
@@ -133,7 +136,8 @@ get_retadores_reto <- function(reto) {
             tp.nombre_retador,
         	nombre_coach
         from tbl_participacion tp inner join tbl_retadores tr on tp.nombre_retador = tr.nombre_retador 
-        where nombre_reto = {reto}", .con = con)
+        where nombre_reto = {reto}
+        order by tp.nombre_retador", .con = con)
     res <- dbGetQuery(con, consulta_sql)
     return(res)
 }
