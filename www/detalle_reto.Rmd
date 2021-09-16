@@ -1,0 +1,105 @@
+---
+output: html_document
+params:
+  reto: NA
+---
+
+---
+title: `r paste("Detalle", params$reto)`
+---
+
+```{r setup, include=FALSE}
+# LIBRERIAS ####################################################################
+library(odbc)
+library(dplyr)
+library(tidyr)
+library(glue)
+library(kableExtra)
+# CONFIGURACIONES GLOBALES #####################################################
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+con <- dbConnect(odbc::odbc(),
+                 .connection_string = "Driver={PostgreSQL ANSI};Uid=ubuntu;Database=herbalife;", 
+                 timeout = 10)
+
+dbSendStatement(con, "SET search_path = reto21")
+```
+
+## Cuenta de Habitos por Retador
+
+```{r habitos}
+consulta_sql <- glue_sql("
+    select
+    	tp.nombre_retador,
+    	trh.nombre_habito,
+    	count(trh.nombre_habito) as n
+    from tbl_registros_habitos trh inner join
+    	tbl_participacion tp on trh.id_participacion = tp.id_participacion inner join
+    	tbl_habitos th on trh.nombre_habito = th.nombre_habito 
+    where tp.nombre_reto = {params$reto}
+    group by tp.nombre_retador, trh.nombre_habito, th.id_habito
+    order by tp.nombre_retador, th.id_habito", .con = con)
+res <- dbGetQuery(con, consulta_sql)
+res %>% 
+  pivot_wider(names_from = nombre_habito, values_from = n, id_cols = nombre_retador) %>% 
+  rename(Retador = nombre_retador) %>%
+  kbl() %>% 
+  kable_paper("striped", full_width = T)
+```
+## Registro de Asistencia a Actividades por Retador
+
+```{r actividades}
+consulta_sql <- glue_sql("
+  select
+  	ta.actividad, 
+  	lower(ta.tiempo_actividad)::date::varchar as fecha,
+  	tp.nombre_retador,
+    tra.nombre_coach
+  from tbl_registros_actividades tra inner join
+  	tbl_participacion tp on tra.id_participacion = tp.id_participacion inner join
+  	tbl_actividades ta on tra.id_actividad = ta.id_actividad 
+  where tp.nombre_reto = {params$reto}
+  order by fecha, nombre_retador", .con = con)
+res <- dbGetQuery(con, consulta_sql)
+res %>% 
+  mutate(Actividad = paste(actividad, format(as.Date(fecha), "%d/%m/%Y"))) %>% 
+  select(Actividad, Retador = nombre_retador, Registrador = nombre_coach) %>% 
+  kbl() %>% 
+  kable_paper("striped", full_width = T) %>%
+  column_spec(1, bold = T) %>%
+  collapse_rows(columns = c(1,3), valign = "top")
+```
+
+## Calificaciones por Retador
+
+```{r}
+consulta_sql <- glue_sql("
+  select
+		tp.nombre_retador,
+		nombre_coach,
+		criterio_calificacion,
+		calificacion
+	from tbl_registros_calificaciones trc inner join
+		tbl_participacion tp on trc.id_participacion = tp.id_participacion inner join 
+		tbl_retos tr on tp.nombre_reto = tr.nombre_reto 
+	where tp.nombre_reto = {params$reto}
+	order by nombre_retador, nombre_coach, criterio_calificacion", .con = con)
+res <- dbGetQuery(con, consulta_sql)
+res %>% 
+  mutate(calificacion = case_when(
+                calificacion == -2 ~ "Mucho Peor",
+                calificacion == -1 ~ "Peor",
+                calificacion == 0 ~ "Igual",
+                calificacion == 1 ~ "Mejor",
+                calificacion == 2 ~ "Mucho Mejor",
+                TRUE ~ NA_character_
+            )) %>% 
+  rename(Retador = nombre_retador, Calificador = nombre_coach, Criterio = criterio_calificacion, Calificacion = calificacion) %>% 
+  kbl() %>% 
+  kable_paper("striped", full_width = T) %>%
+  column_spec(1, bold = T) %>%
+  collapse_rows(columns = 1:2, valign = "top")
+```
+```{r disconnect}
+dbDisconnect(con)
+```
+

@@ -1,0 +1,1787 @@
+source("global.R")
+source("tabs.R")
+ui <- navbarPage(title = "RETO-21",
+                 id = "tabs",
+                 theme = shinytheme("cerulean"),
+                 collapsible = TRUE,
+                 login_tab
+)
+
+server <- function(input, output, session) {
+    # Update functions #########################################################
+    update_listas_retos <- function() {
+        updateSelectInput(session = session,
+                          inputId = "reto_actividad",
+                          choices = c("", get_retos() %>%
+                                          filter(reto_activo) %>%
+                                          pull(nombre_reto)))
+        
+        updateSelectInput(session = session,
+                          inputId = "reto_parametros",
+                          choices = c("", get_retos() %>%
+                                          filter(reto_activo) %>%
+                                          pull(nombre_reto)))
+        
+        updateSelectInput(session = session,
+                          inputId = "reto_habito",
+                          choices = c("", get_retos() %>%
+                                          filter(reto_activo) %>%
+                                          pull(nombre_reto)))
+        
+        updateSelectInput(session = session,
+                          inputId = "reto_reg_actividad",
+                          choices = c("", get_retos() %>%
+                                          filter(reto_activo) %>%
+                                          pull(nombre_reto)))
+        
+        updateCheckboxGroupInput(session = session,
+                                 inputId = "calendarId",
+                                 choices = get_retos() %>%
+                                     filter(reto_activo) %>% 
+                                     mutate(lista = id_reto %>% setNames(nombre_reto)) %>% 
+                                     pull(lista),
+                                 selected = get_retos() %>%
+                                     filter(reto_activo) %>% 
+                                     mutate(lista = id_reto %>% setNames(nombre_reto)) %>% 
+                                     pull(lista))
+    }
+    
+    update_resumen <- function() {
+        output$resumen <- renderCalendar({
+            calendar <- get_retos() %>%
+                filter(reto_activo) %>% 
+                rename(calendarId = id_reto, title = nombre_reto, start = fecha_inicio, end = fecha_fin) %>% 
+                mutate(start = start + hours(5),
+                       end = end + hours(29),
+                       body = NA_character_,
+                       category = 'time') %>% 
+                select(calendarId, title, body, start, end, category) %>% 
+                bind_rows(get_actividades_resumen())
+            
+            colors <- brewer.pal(max(n_groups(calendar %>% group_by(calendarId)), 3), "Accent")[group_indices(calendar %>% group_by(calendarId))]
+            
+            calendar %>% 
+                mutate(bgColor = colors,
+                       color = 'white',
+                       borderColor = colors) %>% 
+                calendar(useNavigation = TRUE, view = "month")%>%
+                cal_month_options(
+                    startDayOfWeek = 1,
+                    daynames = c("Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab")
+                ) %>%
+                cal_week_options(
+                    startDayOfWeek = 1,
+                    daynames = c("Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab")
+                )
+        })
+    }
+    
+    update_calendar <- function() {
+        output$calendario_actividades <- renderCalendar({
+            req(input$reto_actividad)
+            
+            actividades_reto <- get_actividades(reto = isolate(input$reto_actividad))
+            
+            colors <- brewer.pal(max(n_groups(actividades_reto %>% group_by(actividad)), 3), "Accent")[group_indices(actividades_reto %>% group_by(actividad))]
+            
+            actividades_reto %>% 
+                rename(title = actividad,
+                       body = tema_actividad, start = inicio, end = fin) %>% 
+                mutate(calendarId = title,
+                       start = start + hours(5),
+                       end = end + hours(5),
+                       bgColor = colors,
+                       color = 'white',
+                       borderColor = colors,
+                       category = "time",
+                       body = glue("{body} - ({coach_expositor})")) %>% 
+                calendar(useNavigation = TRUE, view = "month") %>%
+                cal_month_options(
+                    startDayOfWeek = 1,
+                    daynames = c("Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab")
+                ) %>%
+                cal_week_options(
+                    startDayOfWeek = 1,
+                    daynames = c("Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab")
+                )
+        })
+    }
+    
+    # Lo-gin logic ##############################################################
+    # hack to add the logout button to the navbar on app launch 
+    insertUI(
+        selector = ".navbar .container-fluid .navbar-collapse",
+        ui = tags$ul(
+            class="nav navbar-nav navbar-right",
+            tags$li(
+                div(
+                    style = "padding: 10px; padding-top: 8px; padding-bottom: 0;",
+                    shinyauthr::logoutUI("logout")
+                )
+            )
+        )
+    )
+    # call the shinyauthr login and logout server modules
+    credentials <- shinyauthr::loginServer(
+        id = "login",
+        data = get_coaches() %>% filter(permiso != 'Inactivo'),
+        user_col = user_coach,
+        pwd_col = password,
+        sodium_hashed = TRUE,
+        reload_on_logout = TRUE,
+        log_out = reactive(logout_init())
+    )
+    
+    # call the log out module with reactive trigger to hide/show
+    logout_init <- shinyauthr::logoutServer(
+        id = "logout",
+        active = reactive(credentials()$user_auth)
+    )
+    
+    # Tab Rendering ############################################################
+    observeEvent(credentials()$user_auth, {
+        # if user logs in successfully
+        if (credentials()$user_auth) { 
+            # remove the login tab
+            removeTab("tabs", "login")
+            appendTab("tabs", resumen, select = TRUE)
+            appendTab("tabs", retadores)
+            appendTab("tabs", participaciones)
+            appendTab("tabs", navbarMenu("Registros",
+                                         parametros,
+                                         habitos,
+                                         reg_actividades,
+                                         fotos)
+                      )
+            appendTab("tabs", calificaciones)
+            appendTab("tabs", resultados)
+            # render tab depending on permissions
+            if (credentials()$info$permiso == "Administrador") {
+                appendTab("tabs", navbarMenu("Configuración",
+                                             actividades,
+                                             retos,
+                                             coaches
+                                             )
+                          )
+            } else if (credentials()$info$permiso == "Coach") {
+                appendTab("tabs", mi_cuenta)
+            }
+        }
+    })
+    
+    # Tab Resumen #############################################################
+    update_resumen()
+    
+    observeEvent(
+        input$view_resumen,
+        cal_proxy_view("resumen", input$view_resumen),
+        ignoreInit = TRUE
+    )
+    
+    observeEvent(input$calendarId, {
+        calendars <- get_retos() %>%
+            filter(reto_activo) %>% 
+            mutate(lista = id_reto %>% setNames(nombre_reto)) %>% 
+            pull(lista)
+        cal_proxy_toggle("resumen", input$calendarId, toHide = FALSE)
+        cal_proxy_toggle("resumen", setdiff(calendars, input$calendarId), toHide = TRUE)
+    }, ignoreInit = TRUE, ignoreNULL = FALSE)
+    
+    # Tab Coaches ##############################################################
+    coaches_insert_callback <- function(data, row) {
+        data <- data %>% 
+            mutate(across(everything(), ~ ifelse(. == "", NA, .)))
+        
+        sql_query <- glue_sql(
+            "INSERT INTO tbl_coaches (nombre_coach, user_coach, password,
+                num_celular_coach, email_coach, permiso, notificacion_correo) VALUES
+                ({data[row,]$nombre_coach},
+                {data[row,]$user_coach},
+                {sodium::password_store(data[row,]$password)},
+                {data[row,]$num_celular_coach},
+                {data[row,]$email_coach},
+                {data[row,]$permiso},
+                {data[row,]$notificacion_correo})",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        
+        return(get_coaches())
+    }
+    
+    coaches_delete_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "DELETE FROM tbl_coaches WHERE id_coach = {data[row,]$id_coach}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        
+        return(get_coaches())
+    }
+    
+    coaches_update_callback <- function(data, olddata, row) {
+        data <- data %>% 
+            mutate(across(everything(), ~ ifelse(. == "", NA, .)))
+        sql_query <- glue_sql(
+            "UPDATE tbl_coaches SET
+                nombre_coach = {data[row,]$nombre_coach},
+                user_coach = {data[row,]$user_coach},
+                password = {if_else(grepl('^\\\\$7\\\\$C6\\\\.\\\\.\\\\.\\\\./\\\\.\\\\.\\\\.\\\\.', data[row,]$password), data[row,]$password, sodium::password_store(data[row,]$password))},
+                num_celular_coach = {data[row,]$num_celular_coach},
+                email_coach = {data[row,]$email_coach},
+                permiso = {data[row,]$permiso},
+                notificacion_correo = {data[row,]$notificacion_correo}
+            WHERE id_coach = {data[row,]$id_coach}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        
+        return(get_coaches())
+    }
+    
+    tbl_coaches <- get_coaches()
+    
+    coaches_result <- dtedit(input, output,
+                            name = 'coaches',
+                            thedata = tbl_coaches,
+                            edit.cols = tail(names(tbl_coaches), -1),
+                            edit.label.cols = c('Nombre', 'Usuario', 'Password',
+                                                'Celular', 'email', 'Permiso',
+                                                'Notificación email'),
+                            input.types = c('permiso' = 'selectInput'),
+                            input.choices = list('permiso' = enum$valor[enum$variable == 'permisos_coach']),
+                            view.cols = c('nombre_coach', 'user_coach', 'permiso'),
+                            delete.info.label.cols = c('Nombre', 'Usuario', 'Permiso'),
+                            show.copy = FALSE, 
+                            title.delete = "Eliminar Coach",
+                            title.edit = "Modificar Informacion de Coach",
+                            title.add = "Agregar Coach",
+                            label.add = "Agregar",
+                            label.edit = "Modificar",
+                            label.delete = "Eliminar",
+                            label.cancel = "Cancelar",
+                            label.save = "Guardar",
+                            text.delete.modal = "¿Está seguro de que quiere eliminar este coach? Sólo se puede eliminar coaches que no hayan guardado registros",
+                            callback.insert = coaches_insert_callback,
+                            callback.delete = coaches_delete_callback,
+                            callback.update = coaches_update_callback,
+                            icon.add = shiny::icon("user-plus"),
+                            icon.delete = shiny::icon("trash"), 
+                            icon.edit = shiny::icon("edit"),
+                            datatable.call = function(...) {
+                                DT::datatable(...) %>%
+                                    formatStyle(
+                                        'nombre_coach',
+                                        fontWeight = 'bold'
+                                    )
+                            },
+                            datatable.options = list(columns = list(
+                                list(title = 'Nombre'),
+                                list(title = 'Usuario'),
+                                list(title = 'Permiso'))
+                            )
+    )
+    
+    # Tab Mi Cuenta ############################################################
+    output$datos_coach <- renderUI({
+        tagList(
+            h1(credentials()$info$nombre_coach),
+            textInput("user_coach", "Usuario:", value = credentials()$info$user_coach),
+            textInput("password", "Password:", value = credentials()$info$password),
+            textInput("num_celular_coach", "Celular:", value = credentials()$info$num_celular_coach),
+            textInput("email_coach", "email:", value = credentials()$info$email_coach),
+            checkboxInput("notificacion_correo", "Notificación Correo:", value = as.logical(as.numeric(credentials()$info$notificacion_correo))),
+            actionButton("guardar_coach", "Guardar", icon = icon("save"))
+        )
+    })
+    
+    observeEvent(input$guardar_coach, {
+        req(input$user_coach, input$password)
+        sql_query <- glue_sql(
+            "UPDATE tbl_coaches SET
+                user_coach = {input$user_coach},
+                password = {if_else(grepl('^\\\\$7\\\\$C6\\\\.\\\\.\\\\.\\\\./\\\\.\\\\.\\\\.\\\\.', input$password), input$password, sodium::password_store(input$password))},
+                num_celular_coach = {if_else(input$num_celular_coach != '', input$num_celular_coach, NA_character_)},
+                email_coach = {if_else(input$email_coach != '', input$email_coach, NA_character_)},
+                notificacion_correo = {input$notificacion_correo}
+            WHERE id_coach = {credentials()$info$id_coach}",
+            .con = con
+        )
+        success <- tryCatch({
+            dbSendQuery(con, sql_query)
+            TRUE
+            },
+            error = function(cond) {
+                showNotification(paste(cond), duration = 3, closeButton = TRUE, type = "error")
+                return(FALSE)
+                }
+            )
+        
+        if (success) {
+            sql_query <- glue_sql(
+                "SELECT *
+                FROM tbl_coaches
+                WHERE id_coach = {credentials()$info$id_coach}")
+            datos_coach <- dbGetQuery(con, sql_query) %>%
+                mutate(across(starts_with("notificacion"), ~ as.logical(as.numeric(.))))
+            
+            updateTextInput(session, inputId = "user_coach", value = datos_coach$user_coach)
+            updateTextInput(session, inputId = "password", value = datos_coach$password)
+            updateTextInput(session, inputId = "num_celular_coach", value = datos_coach$num_celular_coach)
+            updateTextInput(session, inputId = "email_coach", value = datos_coach$email_coach)
+            updateCheckboxInput(session, inputId = "notificacion_correo", value = datos_coach$notificacion_correo)
+           
+            showNotification("Modificaciones guardadas", duration = 3, closeButton = TRUE, type = "message")
+        }
+    })
+    
+    # Tab Retadores ############################################################
+    get_retadores <- function() {
+        consulta_sql <- "
+          SELECT *
+          FROM
+            tbl_retadores
+          ORDER BY id_retador DESC"
+        res <- dbGetQuery(con, consulta_sql)
+        return(res)
+    }
+    
+    retadores_insert_callback <- function(data, row) {
+        data <- data %>% 
+            mutate(across(where(is.character), ~ ifelse(. == "", NA, .)),
+                   across(where(is.numeric),  ~ ifelse(. == 0, NA, .)))
+        
+        sql_query <- glue_sql(
+            "INSERT INTO tbl_retadores (nombre_retador, fecha_nacimiento,
+                num_celular_retador, talla, nombre_coach) VALUES
+                ({data[row,]$nombre_retador},
+                {data[row,]$fecha_nacimiento},
+                {data[row,]$num_celular_retador},
+                {as.numeric(data[row,]$talla)},
+                {credentials()$info$nombre_coach})",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        
+        return(get_retadores())
+    }
+    
+    retadores_delete_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "DELETE FROM tbl_retadores WHERE id_retador = {data[row,]$id_retador}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                if (data[row,]$nombre_coach == isolate(credentials()$info$nombre_coach) | isolate(credentials()$info$permiso == 'Administrador')) {
+                    dbSendQuery(con, sql_query)
+                } else {
+                    stop("No puede eliminar retadores de otros coach")
+                }
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        
+        return(get_retadores())
+    }
+    
+    retadores_update_callback <- function(data, olddata, row) {
+        data <- data %>% 
+            mutate(across(where(is.character), ~ ifelse(. == "", NA, .)),
+                   across(where(is.numeric),  ~ ifelse(. == 0, NA, .)))
+        sql_query <- glue_sql(
+            "UPDATE tbl_retadores SET
+                nombre_retador = {data[row,]$nombre_retador},
+                fecha_nacimiento = {data[row,]$fecha_nacimiento},
+                num_celular_retador = {data[row,]$num_celular_retador},
+                talla = {as.numeric(data[row,]$talla)}
+            WHERE id_retador = {data[row,]$id_retador}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                if (data[row,]$nombre_coach == isolate(credentials()$info$nombre_coach) | isolate(credentials()$info$permiso == 'Administrador')) {
+                    dbSendQuery(con, sql_query)
+                } else {
+                    stop("No puede editar retadores de otros coach")
+                }
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        
+        return(get_retadores())
+    }
+    
+    tbl_retadores <- get_retadores()
+    
+    retadores_result <- dtedit(input, output,
+                             name = 'retadores',
+                             thedata = tbl_retadores,
+                             edit.cols = c('nombre_retador', 'fecha_nacimiento',
+                                           'num_celular_retador', 'talla'),
+                             edit.label.cols = c('Nombres y Apellidos:', 'Fecha Nacimiento:',
+                                                 'Celular:', 'Talla (m):'),
+                             input.types = c('fecha_nacimiento' = 'dateInput', 'talla' = 'numericInput'),
+                             view.cols = c('nombre_retador', 'num_celular_retador', 'nombre_coach'),
+                             delete.info.label.cols = c('Nombre', 'Celular', 'Coach'),
+                             show.copy = FALSE, 
+                             title.delete = "Eliminar Retador",
+                             title.edit = "Modificar Informacion de Retador",
+                             title.add = "Agregar Retador",
+                             label.add = "Agregar",
+                             label.edit = "Modificar",
+                             label.delete = "Eliminar",
+                             label.cancel = "Cancelar",
+                             label.save = "Guardar",
+                             text.delete.modal = "¿Está seguro de que quiere eliminar este retador? Sólo se puede eliminar retadores que no tengan registros",
+                             callback.insert = retadores_insert_callback,
+                             callback.delete = retadores_delete_callback,
+                             callback.update = retadores_update_callback,
+                             icon.add = shiny::icon("user-plus"),
+                             icon.delete = shiny::icon("trash"), 
+                             icon.edit = shiny::icon("edit"),
+                             datatable.call = function(...) {
+                                 DT::datatable(...) %>%
+                                     formatStyle(
+                                         'nombre_retador',
+                                         fontWeight = 'bold'
+                                     )
+                             },
+                             datatable.options = list(columns = list(
+                                 list(title = 'Nombres y Apellidos'),
+                                 list(title = 'Celular'),
+                                 list(title = 'Coach'))
+                             )
+    )
+    
+    # Tab Retos ################################################################
+    retos_insert_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "INSERT INTO tbl_retos (nombre_reto, duracion_reto) VALUES
+                ({paste0('Reto del ', format(as.Date(data[row,]$fecha_inicio), '%d/%m/%Y'), ' al ', format(as.Date(data[row,]$fecha_inicio) + 20, '%d/%m/%Y'))},
+                {paste0('[', data[row,]$fecha_inicio, ',', as.Date(data[row,]$fecha_inicio) + 20, ']')})",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(cond)
+            }
+        )
+        update_resumen()
+        update_listas_retos()
+        return(get_retos())
+    }
+    
+    retos_delete_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "DELETE FROM tbl_retos WHERE id_reto = {data[row,]$id_reto}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(cond)
+            }
+        )
+        update_resumen()
+        update_listas_retos()
+        return(get_retos())
+    }
+    
+    retos_update_callback <- function(data, olddata, row) {
+        sql_query <- glue_sql(
+            "UPDATE tbl_retos SET
+                nombre_reto = {paste0('Reto del ', format(as.Date(data[row,]$fecha_inicio), '%d/%m/%Y'), ' al ', format(as.Date(data[row,]$fecha_inicio) + 20, '%d/%m/%Y'))},
+                duracion_reto = {paste0('[', data[row,]$fecha_inicio, ',', as.Date(data[row,]$fecha_inicio) + 20, ']')},
+                reto_activo = {data[row,]$reto_activo}
+            WHERE id_reto = {data[row,]$id_reto}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(cond)
+            }
+        )
+        update_resumen()
+        update_listas_retos()
+        return(get_retos())
+    }
+    
+    tbl_retos <- get_retos()
+    
+    retos_result <- dtedit(input, output,
+                             name = 'retos',
+                             thedata = tbl_retos,
+                             edit.cols = c('fecha_inicio', 'reto_activo'),
+                             edit.label.cols = c('Fecha Inicio', 'Activo?'),
+                             input.types = c('fecha_inicio' = 'dateInput'),
+                             view.cols = c('nombre_reto', 'fecha_inicio', 'fecha_fin', 'reto_activo'),
+                             delete.info.label.cols = c('Nombre', 'Fecha Inicio', 'Fecha Fin', 'Activo?'),
+                             show.copy = FALSE, 
+                             title.delete = "Eliminar Reto",
+                             title.edit = "Modificar Informacion de Reto",
+                             title.add = "Agregar Reto",
+                             label.add = "Agregar",
+                             label.edit = "Modificar",
+                             label.delete = "Eliminar",
+                             label.cancel = "Cancelar",
+                             label.save = "Guardar",
+                             text.delete.modal = "¿Está seguro de que quiere eliminar este reto? Sólo se puede eliminar retos que no tengan registros",
+                             callback.insert = retos_insert_callback,
+                             callback.delete = retos_delete_callback,
+                             callback.update = retos_update_callback,
+                             icon.add = shiny::icon("plus"),
+                             icon.delete = shiny::icon("trash"), 
+                             icon.edit = shiny::icon("edit"),
+                             datatable.call = function(...) {
+                                 DT::datatable(...) %>%
+                                     formatStyle(
+                                         'nombre_reto',
+                                         fontWeight = 'bold'
+                                     )
+                             },
+                             datatable.options = list(columns = list(
+                                 list(title = 'Nombre'),
+                                 list(title = 'Fecha Inicio'),
+                                 list(title = 'Fecha Fin'),
+                                 list(title = 'Activo?'))
+                             )
+    )
+    
+    # Tab Actividades ##########################################################
+    actividades_insert_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "INSERT INTO tbl_actividades (nombre_reto, actividad, tiempo_actividad,
+                tema_actividad, coach_expositor) VALUES
+                ({input$reto_actividad},
+                {data[row,]$actividad},
+                {paste0('[', data[row,]$inicio - hours(5), ',', data[row,]$inicio - hours(5) + minutes(data[row,]$duracion), ']')},
+                {data[row,]$tema_actividad},
+                {data[row,]$coach_expositor})",
+            .con = con
+        )
+
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        update_calendar()
+        update_resumen()
+        return(get_actividades(reto = isolate(input$reto_actividad)))
+    }
+    
+    actividades_delete_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "DELETE FROM tbl_actividades WHERE id_actividad = {data[row,]$id_actividad}",
+            .con = con
+        )
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        update_calendar()
+        update_resumen()
+        return(get_actividades(reto = isolate(input$reto_actividad)))
+    }
+    
+    actividades_update_callback <- function(data, olddata, row) {
+        sql_query <- glue_sql(
+            "UPDATE tbl_actividades SET
+                actividad = {data[row,]$actividad},
+                tiempo_actividad = {paste0('[', data[row,]$inicio - hours(5), ',', data[row,]$inicio - hours(5) + minutes(data[row,]$duracion), ']')},
+                tema_actividad = {data[row,]$tema_actividad},
+                coach_expositor = {data[row,]$coach_expositor}
+            WHERE id_actividad = {data[row,]$id_actividad}",
+            .con = con
+        )
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        update_calendar()
+        update_resumen()
+        return(get_actividades(reto = isolate(input$reto_actividad)))
+    }
+    
+    tbl_actividades <- reactiveVal(
+        data.frame(id_actividad = numeric(),
+                   actividad = character(),
+                   inicio = as.Date(character()),
+                   fin = as.Date(character()),
+                   duracion = numeric(),
+                   tema_actividad = character(),
+                   coach_expositor = character(),
+                   stringsAsFactors=FALSE)
+    ) 
+    
+    tbl_actividades(get_actividades(reto = isolate(input$reto_actividad)))
+    
+    actividades_result <- dtedit(input, output,
+                             name = 'actividades',
+                             thedata = tbl_actividades,
+                             edit.cols = c('actividad', 'inicio', 'duracion',
+                                           'tema_actividad', 'coach_expositor'),
+                             edit.label.cols = c('Tipo','Inicio', 'Duracion',
+                                                 'Tema', 'Coach'),
+                             input.types = c('actividad' = 'selectInput',
+                                             'inicio' = 'datetimeInput',
+                                             'duracion' = 'numericInput',
+                                             'tema_actividad' = 'textAreaInput',
+                                             'coach_expositor' = 'selectInput'),
+                             input.choices = list('actividad' = enum$valor[enum$variable == 'tipo_actividad'],
+                                                  'coach_expositor' = get_coaches() %>%
+                                                      filter(permiso != 'Inactivo') %>%
+                                                      pull(nombre_coach)),
+                             view.cols = c('actividad', 'inicio_mostrar', 'fin_mostrar',
+                                           'coach_expositor'),
+                             delete.info.label.cols = c('Tipo', 'Inicio', 'Fin',
+                                                        'Coach'),
+                             show.copy = FALSE, 
+                             title.delete = "Eliminar Actividad",
+                             title.edit = "Modificar Informacion de Actividad",
+                             title.add = "Agregar Actividad",
+                             label.add = "Agregar",
+                             label.edit = "Modificar",
+                             label.delete = "Eliminar",
+                             label.cancel = "Cancelar",
+                             label.save = "Guardar",
+                             text.delete.modal = "¿Está seguro de que quiere eliminar esta actividad? Sólo se puede eliminar actividades que no tengan registros",
+                             callback.insert = actividades_insert_callback,
+                             callback.delete = actividades_delete_callback,
+                             callback.update = actividades_update_callback,
+                             icon.add = shiny::icon("calendar-plus"),
+                             icon.delete = shiny::icon("trash"), 
+                             icon.edit = shiny::icon("edit"),
+                             useairDatepicker = TRUE,
+                             datatable.call = function(...) {
+                                 DT::datatable(...) %>%
+                                     formatStyle(
+                                         'actividad',
+                                         fontWeight = 'bold'
+                                     )
+                             },
+                             datatable.options = list(columns = list(
+                                 list(title = 'Actividad'),
+                                 list(title = 'Inicio'),
+                                 list(title = 'Fin'),
+                                 list(title = 'Coach'))
+                             )
+    )
+    
+    observeEvent(input$reto_actividad, {
+        tbl_actividades(get_actividades(reto = input$reto_actividad))
+        update_calendar()
+    })
+    
+    observeEvent(
+        input$view,
+        cal_proxy_view("calendario_actividades", input$view),
+        ignoreInit = TRUE
+    )
+    
+    # Tab Participacion ########################################################
+    participaciones_insert_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "INSERT INTO tbl_participacion (nombre_reto, nombre_retador, objetivo_participacion) VALUES
+                ({input$reto_participacion},
+                {data[row,]$nombre_retador},
+                {data[row,]$objetivo_participacion})",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_participaciones(reto = isolate(input$reto_participacion)))
+    }
+    
+    participaciones_delete_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "DELETE FROM tbl_participacion WHERE id_participacion = {data[row,]$id_participacion}",
+            .con = con
+        )
+        tryCatch(
+            {
+                if (data[row,]$nombre_coach == isolate(credentials()$info$nombre_coach) | isolate(credentials()$info$permiso == 'Administrador')) {
+                    dbSendQuery(con, sql_query)
+                } else {
+                    stop("No puede eliminar participaciones de otros coach")
+                }
+                
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_participaciones(reto = isolate(input$reto_participacion)))
+    }
+    
+    participaciones_update_callback <- function(data, olddata, row) {
+        sql_query <- glue_sql(
+            "UPDATE tbl_participacion SET
+                nombre_retador = {data[row,]$nombre_retador},
+                objetivo_participacion = {data[row,]$objetivo_participacion}
+            WHERE id_participacion = {data[row,]$id_participacion}",
+            .con = con
+        )
+        tryCatch(
+            {
+                if (data[row,]$nombre_coach == isolate(credentials()$info$nombre_coach) | isolate(credentials()$info$permiso == 'Administrador')) {
+                    dbSendQuery(con, sql_query)
+                } else {
+                    stop("No puede editar participaciones de otros coach")
+                }
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_participaciones(reto = isolate(input$reto_participacion)))
+    }
+    
+    tbl_participaciones <- reactiveVal(
+        data.frame(id_participacion = numeric(),
+                   nombre_retador = character(),
+                   objetivo_participacion = character(),
+                   nombre_coach = character(),
+                   num_celular_retador = character(),
+                   stringsAsFactors=FALSE)
+    ) 
+    
+    tbl_participaciones(get_participaciones(reto = isolate(input$reto_participacion)))
+    
+    participaciones_result <- dtedit(input, output,
+                             name = 'participaciones',
+                             thedata = tbl_participaciones,
+                             edit.cols = c('nombre_retador', 'objetivo_participacion'),
+                             edit.label.cols = c('Retador','Objetivo'),
+                             input.types = c('nombre_retador' = 'selectInput',
+                                             'objetivo_participacion' = 'textAreaInput'),
+                             input.choices = list('nombre_retador' = if (credentials()$info$permiso != 'Administrador') {
+                                 get_retadores() %>%
+                                     filter(nombre_coach == credentials()$info$nombre_coach) %>%
+                                     pull(nombre_retador)
+                             } else {
+                                 get_retadores() %>%
+                                     pull(nombre_retador)
+                             }),
+                             view.cols = c('nombre_retador', 'num_celular_retador', 'nombre_coach'),
+                             delete.info.label.cols = c('Retador', 'Celular', 'Coach'),
+                             show.copy = FALSE, 
+                             title.delete = "Eliminar Participación",
+                             title.edit = "Modificar Informacion de Participación",
+                             title.add = "Agregar Participación",
+                             label.add = "Agregar",
+                             label.edit = "Modificar",
+                             label.delete = "Eliminar",
+                             label.cancel = "Cancelar",
+                             label.save = "Guardar",
+                             text.delete.modal = "¿Está seguro de que quiere eliminar esta participación? Sólo se puede eliminar participaciones que no tengan registros",
+                             callback.insert = participaciones_insert_callback,
+                             callback.delete = participaciones_delete_callback,
+                             callback.update = participaciones_update_callback,
+                             icon.add = shiny::icon("user-plus"),
+                             icon.delete = shiny::icon("trash"), 
+                             icon.edit = shiny::icon("edit"),
+                             useairDatepicker = TRUE,
+                             datatable.call = function(...) {
+                                 DT::datatable(...) %>%
+                                     formatStyle(
+                                         'nombre_retador',
+                                         fontWeight = 'bold'
+                                     )
+                             },
+                             datatable.options = list(columns = list(
+                                 list(title = 'Retador'),
+                                 list(title = 'Celular'),
+                                 list(title = 'Coach'))
+                             )
+    )
+    
+    observeEvent(input$reto_participacion, {
+        req(input$reto_participacion)
+        tbl_participaciones(get_participaciones(reto = input$reto_participacion))
+    })
+    # Tab Parametros ###########################################################
+    get_parametros <- function (id_participacion) {
+        consulta_sql <- glue_sql("
+        with parametros as(
+        	select *
+        	from tbl_registros_parametros
+        	where id_participacion = {id_participacion}
+        )	
+        select 
+        	tp.nombre_parametro as \"Parametro\",
+        	p.valor_inicial as \"Inicial\",
+        	p.valor_final as \"Final\",
+        	tp.unidad as \"Und\"
+        from tbl_parametros tp left join parametros p on tp.nombre_parametro = p.nombre_parametro",
+        .con = con)
+        res <- dbGetQuery(con, consulta_sql)
+        return(res)
+    }
+    
+    tbl_parametros <- reactiveVal(
+        get_parametros(0)
+    )
+    
+    parametros_data_update <- dataEditServer("parametros",
+                                  data = reactive(tbl_parametros()),
+                                  col_readonly = c('Parametro', 'Und'),
+                                  col_edit = FALSE,
+                                  row_edit = FALSE
+    )
+    
+    observeEvent(input$reto_parametros, {
+        output$retador_parametros <- renderUI({
+            if (input$reto_parametros != "") {
+                selectInput('retador_parametros',
+                                "Retador:",
+                                choices = c("", if (credentials()$info$permiso != 'Administrador') {
+                                    get_retadores_reto(reto = input$reto_parametros) %>%
+                                        filter(nombre_coach == credentials()$info$nombre_coach) %>%
+                                        pull(nombre_retador)
+                                } else {
+                                    get_retadores_reto(reto = input$reto_parametros) %>%
+                                        pull(nombre_retador)
+                                }))
+            } else if (input$reto_parametros == "") {
+                return()
+            }
+        })
+    })
+    
+    observeEvent({
+        input$retador_parametros
+        input$reto_parametros
+        },
+        {
+        req(input$retador_parametros)
+        tbl_parametros(get_parametros(id_participacion = get_id_participacion(input$reto_parametros, input$retador_parametros)))
+        
+        output$controles_parametros <- renderUI({
+            if (input$retador_parametros != "" & input$reto_parametros != "") {
+                tagList(
+                    dataEditUI("parametros"),
+                    actionButton('guardar_parametro', label = "Guardar")
+                )
+            } else if (input$retador_parametros == "" | input$reto_parametros == "") {
+                return()
+            }
+        })
+    })
+    
+    observeEvent(input$guardar_parametro, {
+        req(input$retador_parametros, input$reto_parametros)
+        
+        db <- dbxConnect(adapter="postgres", dbname="herbalife", user = "ubuntu", variables=list(search_path="reto21"))
+        
+        success <- tryCatch({
+            dbxUpsert(db,
+                      "tbl_registros_parametros",
+                      records = parametros_data_update() %>%
+                          rename(nombre_parametro = Parametro,
+                                 valor_inicial = Inicial,
+                                 valor_final = Final) %>% 
+                          drop_na(valor_inicial) %>% 
+                          mutate(id_participacion = get_id_participacion(input$reto_parametros, input$retador_parametros)) %>% 
+                          select(id_participacion, nombre_parametro, valor_inicial, valor_final),
+                      where_cols = c("id_participacion", "nombre_parametro"))
+            TRUE
+        },
+        error = function(cond) {
+            showNotification(paste(cond), duration = 3, closeButton = TRUE, type = "error")
+            return(FALSE)
+        },
+        finally = {
+            dbxDisconnect(db)
+            tbl_parametros(get_parametros(id_participacion = get_id_participacion(input$reto_parametros, input$retador_parametros)))
+        }
+        )
+        
+        if (success) {
+            showNotification("Parametros guardados", duration = 3, closeButton = TRUE, type = "message")
+        }
+    })
+    
+    # Tab Habitos ##############################################################
+    get_habitos <- function (id_participacion, fecha) {
+        consulta_sql <- glue_sql("
+        with habitos as(
+        	select 
+                id_registro_habito,
+                nombre_habito,
+                nombre_coach
+        	from tbl_registros_habitos
+        	where id_participacion = {id_participacion} and fecha_ocurrencia = {fecha}
+        )
+        select 
+        	th.nombre_habito as \"Hábito\",
+        	count(h.*) as \"Registro\",
+            h.nombre_coach as \"Coach\"
+        from tbl_habitos th left join habitos h on th.nombre_habito = h.nombre_habito
+        group by th.id_habito, th.nombre_habito, h.nombre_coach
+        order by th.id_habito",
+        .con = con)
+        res <- dbGetQuery(con, consulta_sql) %>% 
+            mutate(Registro = Registro != 0)
+        return(res)
+    }
+    
+    tbl_habitos <- reactiveVal(
+        get_habitos(0, '0001-01-01')
+    )
+    
+    habitos_data_update <- dataEditServer("habitos",
+                                          data = reactive(tbl_habitos()),
+                                          col_readonly = c('Hábito', 'Coach'),
+                                          col_options = list(Registro = c(TRUE,FALSE)),
+                                          col_edit = FALSE,
+                                          row_edit = FALSE
+    )
+    
+    observeEvent(input$reto_habito, {
+        output$retador_fecha_habito <- renderUI({
+            if (input$reto_habito != "") {
+                tagList(
+                    dateInput(inputId = 'fecha_habito',
+                              label = 'Fecha:',
+                              min = get_retos() %>% 
+                                  filter(nombre_reto == input$reto_habito) %>% 
+                                  pull(fecha_inicio),
+                              max = get_retos() %>% 
+                                  filter(nombre_reto == input$reto_habito) %>% 
+                                  pull(fecha_fin),
+                              format = "dd-mm-yyyy",
+                              weekstart = 1,
+                              language = "es"),
+                    selectInput('retador_habito',
+                                "Retador:",
+                                choices = c("", get_retadores_reto(reto = input$reto_habito) %>%
+                                        pull(nombre_retador))
+                                )
+                )
+            } else if (input$reto_habito == "") {
+                return()
+            }
+        })
+    })
+    
+    observeEvent({
+        input$retador_habito
+        input$reto_habito
+        input$fecha_habito
+    },
+    {
+        req(input$retador_habito)
+        tbl_habitos(get_habitos(id_participacion = get_id_participacion(input$reto_habito, input$retador_habito),
+                                fecha = input$fecha_habito))
+        
+        output$controles_habitos <- renderUI({
+            if (input$retador_habito != "" & input$reto_habito != "") {
+                tagList(
+                    dataEditUI("habitos"),
+                    actionButton('guardar_habito', label = "Guardar")
+                )
+            } else if (input$retador_habito == "" | input$reto_habito == "") {
+                return()
+            }
+        })
+    })
+    
+    observeEvent(input$guardar_habito, {
+        req(input$retador_habito, input$reto_habito, input$fecha_habito)
+        
+        db <- dbxConnect(adapter="postgres", dbname="herbalife", user = "ubuntu", variables=list(search_path="reto21"))
+        
+        success <- tryCatch({
+            dbxUpsert(db,
+                      "tbl_registros_habitos",
+                      records = habitos_data_update() %>%
+                          filter(Registro) %>% 
+                          rename(nombre_habito = Hábito) %>% 
+                          mutate(id_participacion = get_id_participacion(input$reto_habito, input$retador_habito),
+                                 nombre_coach = credentials()$info$nombre_coach,
+                                 fecha_ocurrencia = input$fecha_habito) %>% 
+                          select(id_participacion, nombre_coach, fecha_ocurrencia, nombre_habito),
+                      where_cols = c("id_participacion", "nombre_habito", "fecha_ocurrencia"),
+                      skip_existing = TRUE)
+            dbxDelete(db,
+                      "tbl_registros_habitos",
+                      where = habitos_data_update() %>%
+                          filter(!Registro) %>% 
+                          rename(nombre_habito = Hábito) %>% 
+                          mutate(id_participacion = get_id_participacion(input$reto_habito, input$retador_habito),
+                                 fecha_ocurrencia = input$fecha_habito,
+                                 nombre_coach = credentials()$info$nombre_coach) %>% 
+                          select(id_participacion, fecha_ocurrencia, nombre_habito, nombre_coach))
+            TRUE
+        },
+        error = function(cond) {
+            showNotification(paste(cond), duration = 3, closeButton = TRUE, type = "error")
+            return(FALSE)
+        },
+        finally = {
+            dbxDisconnect(db)
+            tbl_habitos(get_habitos(id_participacion = get_id_participacion(input$reto_habito, input$retador_habito),
+                                    fecha = input$fecha_habito))
+        }
+        )
+        
+        if (success) {
+            showNotification("Hábitos guardados", duration = 3, closeButton = TRUE, type = "message")
+        }
+    })
+    
+    # Tab Reg Actividades #####################################################
+    get_reg_actividades <- function (reto, id_actividad) {
+        consulta_sql <- glue_sql("
+        with asistencia as (
+        	select 
+        		id_registro_actividad,
+        		id_participacion,
+                nombre_coach
+        	from tbl_registros_actividades
+        	where id_actividad = {id_actividad}
+        )
+        select
+            tp.id_participacion as id,
+        	tp.nombre_retador as \"Retador\",
+        	count(a.id_registro_actividad) as \"Registro\",
+            a.nombre_coach as \"Coach\"
+        from tbl_participacion tp left join asistencia a on tp.id_participacion = a.id_participacion
+        where tp.nombre_reto = {reto}
+        group by tp.nombre_retador, tp.id_participacion, a.nombre_coach
+        order by tp.nombre_retador
+        ",
+        .con = con)
+        res <- dbGetQuery(con, consulta_sql) %>% 
+            mutate(Registro = Registro != 0)
+        return(res)
+    }
+    
+    tbl_reg_actividades <- reactiveVal(
+        data.frame(
+            id = 0,
+            Retador = "",
+            Registro = "",
+            Coach = ""
+        )
+    )
+    
+    actividades_data_update <- dataEditServer("reg_actividades",
+                                          data = reactive(tbl_reg_actividades()),
+                                          col_readonly = c('id','Retador', 'Coach'),
+                                          col_options = list(Registro = c(TRUE,FALSE)),
+                                          col_edit = FALSE,
+                                          row_edit = FALSE
+    )
+    
+    observeEvent(input$reto_reg_actividad, {
+        output$id_actividad <- renderUI({
+            if (input$reto_reg_actividad != "") {
+                req(input$reto_reg_actividad)
+                selectInput('id_actividad',
+                            "Actividad:",
+                            choices = c("", get_actividades(reto = input$reto_reg_actividad) %>% 
+                                            mutate(etiquetas = paste(actividad, format(inicio, "%d/%m/%Y")),
+                                                   lista = id_actividad %>% setNames(etiquetas)) %>% 
+                                            pull(lista))
+                )
+            } else if (input$reto_reg_actividad == "") {
+                return()
+            }
+        })
+    })
+    
+    observeEvent({
+        input$reto_reg_actividad
+        input$id_actividad
+    },
+    {
+        req(input$reto_reg_actividad, input$id_actividad)
+        
+        tbl_reg_actividades(get_reg_actividades(reto = input$reto_reg_actividad,
+                                                id_actividad = input$id_actividad))
+        
+        output$controles_actividades <- renderUI({
+            if (input$reto_reg_actividad != "" & input$id_actividad != "") {
+                tagList(
+                    dataEditUI("reg_actividades"),
+                    actionButton('guardar_actividad', label = "Guardar")
+                )
+            } else if (input$reto_reg_actividad == "" | input$id_actividad == "") {
+                return()
+            }
+        })
+    })
+    
+    observeEvent(input$guardar_actividad, {
+        req(input$reto_reg_actividad, input$id_actividad)
+        
+        db <- dbxConnect(adapter="postgres", dbname="herbalife", user = "ubuntu", variables=list(search_path="reto21"))
+        
+        success <- tryCatch({
+            dbxUpsert(db,
+                      "tbl_registros_actividades",
+                      records = actividades_data_update() %>%
+                          filter(Registro) %>% 
+                          rename(id_participacion = id) %>% 
+                          mutate(id_actividad = input$id_actividad,
+                                 nombre_coach = credentials()$info$nombre_coach
+                          ) %>% 
+                          select(id_participacion, nombre_coach, id_actividad),
+                      where_cols = c("id_participacion", "id_actividad"),
+                      skip_existing = TRUE)
+            dbxDelete(db,
+                      "tbl_registros_actividades",
+                      where = actividades_data_update() %>%
+                          filter(!Registro) %>% 
+                          rename(id_participacion = id) %>%  
+                          mutate(id_actividad = input$id_actividad,
+                                 nombre_coach = credentials()$info$nombre_coach) %>% 
+                          select(id_participacion, id_actividad, nombre_coach))
+            TRUE
+        },
+        error = function(cond) {
+            showNotification(paste(cond), duration = 3, closeButton = TRUE, type = "error")
+            return(FALSE)
+        },
+        finally = {
+            dbxDisconnect(db)
+            tbl_reg_actividades(get_reg_actividades(reto = input$reto_reg_actividad,
+                                                    id_actividad = input$id_actividad))
+        })
+        
+        if (success) {
+            showNotification("Asistencias guardadas", duration = 3, closeButton = TRUE, type = "message")
+        }
+    })
+    
+    # Tab Foto #################################################################
+    observeEvent(input$reto_foto, {
+        output$retador_foto <- renderUI({
+            if (input$reto_foto != "") {
+                req(input$reto_foto)
+                selectInput("retador_foto",
+                            "Nombre Retador:", 
+                            choices = c("", if (credentials()$info$permiso != 'Administrador') {
+                                get_retadores_reto(reto = input$reto_foto) %>%
+                                    filter(nombre_coach == credentials()$info$nombre_coach) %>%
+                                    pull(nombre_retador)
+                            } else {
+                                get_retadores_reto(reto = input$reto_foto) %>%
+                                    pull(nombre_retador)
+                            })
+                            
+                )
+            } else if (input$reto_foto == "") {
+                return()
+            }
+        })
+    })
+    
+    observeEvent({
+        input$reto_foto
+        input$retador_foto
+    },
+    {
+        req(input$reto_foto)
+        
+        output$controles_foto <- renderUI({
+            if (input$reto_foto != "" & input$retador_foto != "") {
+                tagList(
+                    selectInput("tipo",
+                                "Tipo:", 
+                                choices = c("", enum$valor[enum$variable == 'tipo_foto']),
+                                selected = ""
+                                
+                    ),
+                    selectInput("estado",
+                                "Estado:", 
+                                choices = c("", enum$valor[enum$variable == 'estado_foto']),
+                                selected = ""
+                                
+                    ),
+                    fileInput("upload", "Seleccionar Imagen:", accept = c('image/jpeg')),
+                    actionButton(inputId = "guardar_foto", label = "Guardar")
+                )
+            } else if (input$reto_foto == "" | input$retador_foto == "") {
+                output$img <- renderImage({list(src = "", contentType = "image/jpeg")}, deleteFile=FALSE)
+                return()
+            }
+        })
+    })
+    
+    observeEvent(input$upload, {
+        if (length(input$upload$datapath)) {
+            output$img <- renderImage({
+                
+                tmp <-  image_read(input$upload$datapath) %>%
+                    image_resize("300x") %>% 
+                    image_write(tempfile(fileext='jpg'), format = 'jpg')
+
+                list(src = tmp, contentType = "image/jpeg")
+                
+            },  deleteFile=FALSE)  
+        }
+        
+    })
+    
+    observeEvent(input$guardar_foto, {
+        req(input$reto_foto, input$retador_foto, input$tipo, input$estado)
+        tmp <-  image_read(input$upload$datapath) %>%
+            image_resize("300x") %>% 
+            image_write(tempfile(fileext='jpg'), format = 'jpg')
+        image_raw <- readRaw(file = tmp)
+        image_raw <- image_raw$fileRaw
+
+        success <- tryCatch({
+            DBI::dbExecute(conn = con,
+                      statement = "
+                      INSERT INTO tbl_fotos (id_participacion, tipo, estado, archivo, nombre_coach) 
+                      VALUES (?, ?, ?, ?, ?)
+                      ON CONFLICT ON CONSTRAINT uq_participacion_tipo_estado
+                      DO UPDATE SET 
+                        archivo = EXCLUDED.archivo,
+                        nombre_coach = EXCLUDED.nombre_coach",
+                      params = list(get_id_participacion(input$reto_foto, input$retador_foto),
+                                    input$tipo,
+                                    input$estado,
+                                    paste(image_raw, collapse = ""),
+                                    credentials()$info$nombre_coach)
+                      )
+            TRUE
+        },
+        error = function(cond) {
+            showNotification(paste(cond), duration = 3, closeButton = TRUE, type = "error")
+            return(FALSE)
+        },
+        finally = {
+            updateSelectInput(session = session, "retador_foto", selected = "")
+        })
+        
+        if (success) {
+            showNotification("Foto guardada", duration = 3, closeButton = TRUE, type = "message")
+        }
+    })
+    
+    
+    # Tab Calificacion #########################################################
+    
+    get_calificaciones <- function (id_participacion, coach) {
+        consulta_sql <- glue_sql("
+        with calificaciones as (
+        	select *
+        	from tbl_registros_calificaciones
+        	where id_participacion = {id_participacion} and
+                nombre_coach = {coach}
+        )	
+        select 
+        	tcc.criterio_calificacion as \"Criterio\",
+        	c.calificacion
+        from tbl_criterios_calificacion tcc left join calificaciones c on tcc.criterio_calificacion = c.criterio_calificacion",
+        .con = con)
+        res <- dbGetQuery(con, consulta_sql) %>% 
+            mutate(calificacion = case_when(
+                calificacion == -2 ~ "Mucho Peor",
+                calificacion == -1 ~ "Peor",
+                calificacion == 0 ~ "Igual",
+                calificacion == 1 ~ "Mejor",
+                calificacion == 2 ~ "Mucho Mejor",
+                TRUE ~ NA_character_
+            )) %>% 
+            rename(Calificación = calificacion)
+        return(res)
+    }
+    
+    to_bin <- function(raw) {
+        as.raw(strtoi(substring(raw, seq(1,nchar(raw), by=2),
+                                seq(2,nchar(raw), by=2)),
+                      base=16))
+    }
+    
+    tbl_calificaciones <- reactiveVal(
+        get_calificaciones(0, "")
+    )
+    
+    calificaciones_data_update <- dataEditServer("calificaciones",
+                                             data = reactive(tbl_calificaciones()),
+                                             col_readonly = c('Criterio'),
+                                             col_options = list(Calificación = c("Mucho Peor",
+                                                                                 "Peor",
+                                                                                 "Igual",
+                                                                                 "Mejor",
+                                                                                 "Mucho Mejor")
+                                                                ),
+                                             col_edit = FALSE,
+                                             row_edit = FALSE,
+                                             col_stretch = TRUE,
+                                             height = 200,
+                                             width = 400
+    )
+    
+    observeEvent(input$reto_calificacion, {
+        output$retador_calificacion <- renderUI({
+            if (input$reto_calificacion != "") {
+                selectInput('retador_calificacion',
+                            "Retador:",
+                            choices = c("", get_retadores_reto(reto = input$reto_calificacion) %>%
+                                            pull(nombre_retador))
+                            )
+            } else if (input$reto_calificacion == "") {
+                return()
+            }
+        })
+    })
+    
+    observeEvent({
+        input$reto_calificacion
+        input$retador_calificacion
+    },
+    {
+        req(input$retador_calificacion)
+        id_participacion = get_id_participacion(input$reto_calificacion, input$retador_calificacion)
+        tbl_calificaciones(get_calificaciones(id_participacion, credentials()$info$nombre_coach))
+        
+        output$controles_calificacion <- renderUI({
+            if (input$retador_calificacion != "" & input$reto_calificacion != "") {
+                tagList(
+                    dataEditUI("calificaciones"),
+                    actionButton('guardar_calificacion', label = "Guardar")
+                )
+            } else if (input$retador_calificacion == "" | input$reto_calificacion == "") {
+                output$edad <- renderText({""})
+                output$objetivo <- renderText({""})
+                output$parametros <- renderTable({return()})
+                output$fotos <- renderTable({return()})
+                return()
+            }
+        })
+        
+        output$objetivo <- renderText({
+            consulta_sql <- glue_sql("
+            select 
+            	objetivo_participacion
+            from tbl_participacion
+            where id_participacion = {id_participacion}",
+            .con = con)
+            objetivo <- dbGetQuery(con, consulta_sql) %>% pull(objetivo_participacion)
+            paste("Objetivo:", objetivo)
+        })
+        
+        output$edad <- renderText({
+            consulta_sql <- glue_sql("
+            select 
+                age(current_date, fecha_nacimiento) as edad
+            from tbl_retadores
+            where nombre_retador = {input$retador_calificacion}",
+            .con = con)
+            edad <- dbGetQuery(con, consulta_sql) %>% pull(edad) %>% 
+                stringr::str_replace_all(c('years?' = "Años",
+                                           'mons' = 'Meses',
+                                           'mon\\s' = 'Mes ',
+                                           'days' = 'Días',
+                                           'day\\s' = 'Día'))
+            paste("Edad:", edad)
+        })
+        
+        output$parametros <- renderTable({
+            get_parametros(id_participacion)
+        })
+        
+        output$fotos <- renderTable({
+            unlink("www/*.jpg")
+            consulta_sql<- glue("
+            SELECT
+                tipo,
+                estado,
+                archivo
+            from
+                tbl_fotos
+            where
+                id_participacion = {id_participacion}")
+            dbGetQuery(con, consulta_sql) %>%
+                rowwise() %>%
+                mutate(archivo = archivo %>% 
+                           paste(collapse = "")) %>%
+                mutate(archivo = list(to_bin(archivo))) %>%
+                mutate(archivo = archivo %>% 
+                           image_read() %>% 
+                           image_write(path = paste0("www/",tipo,"_",estado,"_",id_participacion,".jpg"), format = 'jpg'),
+                       archivo = paste0('<img src=', stringr::str_remove(archivo, "www/"), '></img>')) %>%
+                pivot_wider(names_from = estado, values_from = archivo, id_cols = tipo)
+        }, sanitize.text.function = function(x) x)
+    })
+    
+    observeEvent(input$guardar_calificacion, {
+        req(input$reto_calificacion, input$retador_calificacion)
+        
+        db <- dbxConnect(adapter="postgres", dbname="herbalife", user = "ubuntu", variables=list(search_path="reto21"))
+        
+        success <- tryCatch({
+            dbxUpsert(db,
+                      "tbl_registros_calificaciones",
+                      records = calificaciones_data_update() %>%
+                          rename(criterio_calificacion = Criterio,
+                                 calificacion = Calificación) %>% 
+                          mutate(id_participacion = get_id_participacion(input$reto_calificacion, input$retador_calificacion),
+                                 nombre_coach = credentials()$info$nombre_coach,
+                                 calificacion = case_when(
+                                     calificacion == "Mucho Peor" ~ -2,
+                                     calificacion == "Peor" ~ -1,
+                                     calificacion == "Igual" ~ 0,
+                                     calificacion == "Mejor" ~ 1,
+                                     calificacion == "Mucho Mejor" ~ 2,
+                                     TRUE ~ NA_real_
+                                 )) %>% 
+                          drop_na(calificacion) %>% 
+                          select(id_participacion, nombre_coach, criterio_calificacion, calificacion),
+                      where_cols = c("id_participacion", "nombre_coach", "criterio_calificacion"))
+            TRUE
+        },
+        error = function(cond) {
+            showNotification(paste(cond), duration = 3, closeButton = TRUE, type = "error")
+            return(FALSE)
+        },
+        finally = {
+            dbxDisconnect(db)
+            id_participacion = get_id_participacion(input$reto_calificacion, input$retador_calificacion)
+            tbl_calificaciones(get_calificaciones(id_participacion, credentials()$info$nombre_coach))
+        })
+        
+        if (success) {
+            showNotification("Calificación guardada", duration = 3, closeButton = TRUE, type = "message")
+        }
+    })
+    
+    # Tab Resultados ###########################################################
+    
+    observeEvent(input$reto_resultados, {
+        output$retador_resultados <- renderUI({
+            if (input$reto_resultados != "") {
+                selectInput('retador_resultados',
+                            "Retador:",
+                            choices = c("", get_retadores_reto(reto = input$reto_resultados) %>%
+                                            pull(nombre_retador))
+                            )
+            } else if (input$reto_resultados == "") {
+                return()
+            }
+        })
+        
+        output$resultados_reto <- renderPlot({
+            req(input$reto_resultados)
+            consulta_sql<- glue("
+            with cuenta_habitos as (
+            	select
+            	concepto,
+            	tp.nombre_retador,
+            	nombre_habito,
+            	count(nombre_habito) as n
+            	from tbl_registros_habitos trh inner join
+            		tbl_participacion tp on trh.id_participacion = tp.id_participacion
+            	group by concepto, tp.nombre_reto, tp.nombre_retador, nombre_habito
+            	having tp.nombre_reto = '{input$reto_resultados}')
+            select
+            	nombre_retador,
+            	'Habitos' as concepto,
+            	sum(n * peso_habito)/21 * peso_concepto * 100 as puntaje
+            from cuenta_habitos ch inner join
+            	tbl_habitos th on ch.nombre_habito = th.nombre_habito inner join
+            	tbl_conceptos tc on ch.concepto = tc.concepto
+            group by nombre_retador, peso_concepto")
+            puntaje_habitos <- dbGetQuery(con, consulta_sql)
+            
+            consulta_sql<- glue("
+            with actividades as (
+            	select
+            		nombre_reto,
+            		count(id_actividad) as tot
+            	from tbl_actividades
+            	group by nombre_reto
+            	having nombre_reto = '{input$reto_resultados}')
+            select
+            	tp.nombre_retador,
+            	'Actividades' as concepto,
+            	count(id_actividad) / sum(a.tot) * tc.peso_concepto * 100 as puntaje
+            from tbl_registros_actividades tra inner join
+            	tbl_participacion tp on tra.id_participacion = tp.id_participacion inner join
+            	actividades a on tp.nombre_reto = a.nombre_reto inner join
+            	tbl_conceptos tc on tra.concepto = tc.concepto
+            group by tp.nombre_reto, tp.nombre_retador, tc.peso_concepto")
+            puntaje_actividades <- dbGetQuery(con, consulta_sql)
+            
+            consulta_sql<- glue("
+            with promedio_calificacion as (
+            	select
+            		concepto,
+            		tp.nombre_retador,
+            		criterio_calificacion,
+            		avg(calificacion) as prom
+            	from tbl_registros_calificaciones trc inner join
+            		tbl_participacion tp on trc.id_participacion = tp.id_participacion
+            	group by concepto, tp.nombre_reto, tp.nombre_retador, criterio_calificacion
+            	having tp.nombre_reto = '{input$reto_resultados}')
+            select
+            	nombre_retador,
+            	'Calificacion' as concepto,
+            	sum(prom * peso_criterio)/2 * tc.peso_concepto * 100 as puntaje
+            from promedio_calificacion pc inner join
+            	tbl_criterios_calificacion tcc on pc.criterio_calificacion = tcc.criterio_calificacion inner join
+            	tbl_conceptos tc on pc.concepto = tc.concepto
+            group by nombre_retador, tc.peso_concepto")
+            puntaje_calificaciones <- dbGetQuery(con, consulta_sql)
+            
+            puntaje_habitos %>% 
+                bind_rows(puntaje_actividades) %>% 
+                bind_rows(puntaje_calificaciones) %>%
+                group_by(nombre_retador) %>% 
+                mutate(puntaje = if_else(puntaje < 0, 0, puntaje),
+                       total = sum(puntaje, na.rm = TRUE)) %>%
+                ungroup() %>% 
+                ggplot(aes(x = puntaje, y = reorder(nombre_retador, total), fill = concepto)) +
+                geom_col(position = "stack") +
+                geom_text(aes(label = round(total, 2), x = total), hjust = -0.5) +
+                scale_x_continuous(limits = c(0,100), expand = expansion(add = c(0, 10))) +
+                coord_cartesian(clip = "off") +
+                labs(title = "Puntaje por Retador",
+                     x = "Puntaje",
+                     y = "Retador(a)",
+                     fill = "Concepto") +
+                theme_minimal() +
+                theme(legend.position = "bottom")
+        })
+        
+        output$boton_detalle_reto <- renderUI({
+            if (input$reto_resultados != "") {
+                downloadButton("detalle_reto", label = "Reporte Detallado")
+            } else if (input$reto_resultados == "") {
+                return()
+            }
+        })
+    })
+    
+    output$detalle_reto <- downloadHandler(
+        filename = paste0("detalle_reto_",
+                          dmy(str_extract(input$reto_resultados,
+                                          "(?<=del\\s)\\d{2}/\\d{2}/\\d{4}")),
+                          ".html"),
+        content = function(file) {
+            tempReport <- file.path(tempdir(), "detalle_reto.Rmd")
+            file.copy("www/detalle_reto.Rmd", tempReport, overwrite = TRUE)
+            
+            params <- list(reto = input$reto_resultados)
+            
+            rmarkdown::render(tempReport, output_file = file,
+                              params = params,
+                              envir = new.env(parent = globalenv())
+            )
+        }
+    )
+    
+    observeEvent({
+        input$reto_resultados
+        input$retador_resultados
+    },
+    {
+        if (input$reto_resultados != "" & input$retador_resultados != "") {
+            output$resultados_retador <- renderPlot({
+                req(input$reto_resultados)
+                consulta_sql<- glue("
+                with cuenta_habitos as (
+                	select
+                	concepto,
+                	fecha_ocurrencia,
+                	nombre_habito,
+                	count(nombre_habito) as n
+                	from tbl_registros_habitos trh inner join
+                		tbl_participacion tp on trh.id_participacion = tp.id_participacion
+                	group by concepto, tp.nombre_reto, tp.nombre_retador, fecha_ocurrencia, nombre_habito
+                	having tp.nombre_reto = '{input$reto_resultados}' and
+                		tp.nombre_retador = '{input$retador_resultados}')
+                select
+                	'Habitos' as concepto,
+                	fecha_ocurrencia,
+                	sum(n * peso_habito)/21 * peso_concepto * 100 as puntaje
+                from cuenta_habitos ch inner join
+                	tbl_habitos th on ch.nombre_habito = th.nombre_habito inner join
+                	tbl_conceptos tc on ch.concepto = tc.concepto
+                group by fecha_ocurrencia, peso_concepto")
+                puntaje_habitos <- dbGetQuery(con, consulta_sql)
+                
+                consulta_sql<- glue("
+                with actividades as (
+                	select
+                		nombre_reto,
+                		count(id_actividad) as tot
+                	from tbl_actividades
+                	group by nombre_reto
+                	having nombre_reto = '{input$reto_resultados}')
+                select
+                	'Actividades' as concepto,
+                	max(upper(tiempo_actividad)::date) as fecha_ocurrencia,
+                	count(tra.id_actividad) / sum(a.tot) * tc.peso_concepto * 100 as puntaje
+                from tbl_registros_actividades tra inner join
+                	tbl_participacion tp on tra.id_participacion = tp.id_participacion inner join
+                	actividades a on tp.nombre_reto = a.nombre_reto inner join
+                	tbl_conceptos tc on tra.concepto = tc.concepto inner join 
+                	tbl_actividades ta on tra.id_actividad = ta.id_actividad 
+                group by tp.nombre_reto, tp.nombre_retador, tc.peso_concepto, tiempo_actividad
+                having tp.nombre_retador = '{input$retador_resultados}'")
+                puntaje_actividades <- dbGetQuery(con, consulta_sql)
+                
+                consulta_sql<- glue("
+                with promedio_calificacion as (
+                	select
+                		concepto,
+                		tp.nombre_retador,
+                		criterio_calificacion,
+                		upper(tr.duracion_reto) - 1 as fecha_ocurrencia,
+                		avg(calificacion) as prom
+                	from tbl_registros_calificaciones trc inner join
+                		tbl_participacion tp on trc.id_participacion = tp.id_participacion inner join 
+                		tbl_retos tr on tp.nombre_reto = tr.nombre_reto 
+                	group by concepto, tp.nombre_reto, tr.duracion_reto, tp.nombre_retador, criterio_calificacion
+                	having tp.nombre_reto = '{input$reto_resultados}' and
+                		tp.nombre_retador = '{input$retador_resultados}')
+                select
+                	'Calificacion' as concepto,
+                	fecha_ocurrencia,
+                	round(sum(prom * peso_criterio)/2 * tc.peso_concepto * 100, 2) as puntaje
+                from promedio_calificacion pc inner join
+                	tbl_criterios_calificacion tcc on pc.criterio_calificacion = tcc.criterio_calificacion inner join
+                	tbl_conceptos tc on pc.concepto = tc.concepto
+                group by nombre_retador, fecha_ocurrencia, tc.peso_concepto;")
+                puntaje_calificaciones <- dbGetQuery(con, consulta_sql)
+                
+                plot_data <- puntaje_habitos %>% 
+                    bind_rows(puntaje_actividades) %>% 
+                    bind_rows(puntaje_calificaciones) %>%
+                    group_by(fecha_ocurrencia) %>% 
+                    mutate(puntaje = if_else(puntaje < 0, 0, puntaje),
+                           total = sum(puntaje, na.rm = TRUE)) %>%
+                    ungroup()
+                
+                plot_data %>% 
+                    ggplot(aes(x = fecha_ocurrencia, y = puntaje, fill = concepto)) +
+                    geom_col(position = "stack") +
+                    geom_text(aes(label = round(total, 2), y = total), vjust = -0.5) +
+                    coord_cartesian(clip = "off") +
+                    scale_x_date(date_breaks = "1 day",
+                                 labels = scales::label_date_short(),
+                                 expand = c(0.005,0.005)) +
+                    labs(title = glue("Puntaje de {input$retador_resultados} por Fecha"),
+                         x = "Fecha",
+                         y = "Puntaje",
+                         fill = "Concepto") +
+                    theme_minimal() +
+                    theme(legend.position = "bottom")
+            })
+            
+            output$boton_detalle_retador <- renderUI({downloadButton("detalle_retador", label = "Reporte Detallado")})
+            
+        } else if (input$reto_resultados == "" | input$retador_resultados == "") {
+            updateSelectInput(session = session, "retador_resultados", selected = "")
+            output$boton_detalle_retador <- renderUI({return()})
+        }
+    })
+    
+    output$detalle_retador <- downloadHandler(
+        filename = paste0("detalle_reto_",
+                          dmy(str_extract(input$reto_resultados,
+                                          "(?<=del\\s)\\d{2}/\\d{2}/\\d{4}")),
+                          "_",
+                          str_replace_all(input$retador_resultados, "\\s", "_"),
+                          ".html"),
+        content = function(file) {
+            tempReport <- file.path(tempdir(), "detalle_retador.Rmd")
+            file.copy("www/detalle_retador.Rmd", tempReport, overwrite = TRUE)
+            
+            params <- list(reto = input$reto_resultados, retador = input$retador_resultados)
+            
+            rmarkdown::render(tempReport, output_file = file,
+                              params = params,
+                              envir = new.env(parent = globalenv())
+            )
+        }
+    )
+    
+    # Close app procedures #####################################################
+    
+    session$onSessionEnded(function() {
+        stopApp()
+    })
+}
+
+onStop(function() {
+    dbDisconnect(con)
+})
+
+shinyApp(ui = ui, server = server)
