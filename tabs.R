@@ -34,7 +34,9 @@ resumen <- tabPanel(title = icon("home"),
                                            filter(reto_activo) %>% 
                                            mutate(lista = id_reto %>% setNames(nombre_reto)) %>% 
                                            pull(lista)
-                                   ))
+                                   )),
+                            column(width = 2,
+                                   downloadButton("csv_calendario", "Exportar"))
                         )
                     )
 )

@@ -248,6 +248,28 @@ server <- function(input, output, session) {
         cal_proxy_toggle("resumen", setdiff(calendars, input$calendarId), toHide = TRUE)
     }, ignoreInit = TRUE, ignoreNULL = FALSE)
     
+    output$csv_calendario <- downloadHandler(
+        filename = paste0("calendario-", Sys.Date(), ".csv"),
+        content = function(file) {
+            consulta_sql <- "
+            select
+            	tr.id_reto,
+            	actividad as \"Subject\",
+            	lower(tiempo_actividad)::date as \"Start Date\",
+            	lower(tiempo_actividad)::time as \"Start Time\",
+            	upper(tiempo_actividad)::date as \"End Date\",
+            	upper(tiempo_actividad)::time as \"End Time\",
+            	tr.nombre_reto || '\n' || tema_actividad || '\n' || ta.coach_expositor as \"Description\",
+            	'Zoom' as \"Location\"
+            from tbl_actividades ta inner join tbl_retos tr on ta.nombre_reto = tr.nombre_reto
+            where tr.reto_activo = true"
+            res <- dbGetQuery(con, consulta_sql) %>% 
+                filter(id_reto %in% input$calendarId) %>% 
+                select(-id_reto)
+            write.csv(res, file)
+        }
+    )
+    
     # Tab Coaches ##############################################################
     coaches_insert_callback <- function(data, row) {
         data <- data %>% 
