@@ -692,7 +692,7 @@ server <- function(input, output, session) {
                                      }
                                  },
                                  num_celular_retador = function(x, value) {
-                                     if (value != "" && !str_detect(value, '^\\d{9}$')) {
+                                     if (!str_detect(value, '^\\d{9}$')) {
                                          shinyFeedback::showFeedbackWarning(
                                              inputId = x,
                                              text = "Número de celular inválido, el campo debe contener 9 números"

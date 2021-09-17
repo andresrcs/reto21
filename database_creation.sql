@@ -16,6 +16,7 @@ create table if not exists tbl_coaches (
     email_coach varchar,
     permiso permisos_coach not null default 'Coach'::permisos_coach,
     notificacion_correo boolean not null default false,
+    constraint nombre_valido check (nombre_coach ~ '^.{3,}\s.{3}'),
     constraint usuario_valido check (user_coach ~ '.{4,}'),
     constraint password_valido check (password ~ '^[a-zA-Z0-9!¡/@#$¿?%^&*"\[\]\{\}<>\(\)=\-_´+`~:;,.€\|]+$'),
     constraint celular_valido check (num_celular_coach ~ '^\d{9}$'),
@@ -59,6 +60,7 @@ create table if not exists tbl_retadores (
     constraint fk_nombre_coach foreign key (nombre_coach)
 		references tbl_coaches (nombre_coach)
 		on update cascade on delete restrict,
+	constraint nombre_valido check (nombre_retador ~ '^.{3,}\s.{3}'),
     constraint celular_valido check (num_celular_retador ~ '^\d{9}$'),
 );
    
