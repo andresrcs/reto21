@@ -134,11 +134,13 @@ get_retadores_reto <- function(reto) {
     consulta_sql <- glue_sql("
         select 
             tp.nombre_retador,
+            tr.num_celular_retador,
         	nombre_coach
         from tbl_participacion tp inner join tbl_retadores tr on tp.nombre_retador = tr.nombre_retador 
         where nombre_reto = {reto}
         order by tp.nombre_retador", .con = con)
-    res <- dbGetQuery(con, consulta_sql)
+    res <- dbGetQuery(con, consulta_sql) %>% 
+        mutate(lista = nombre_retador %>% setNames(paste(nombre_retador, "-", num_celular_retador)))
     return(res)
 }
 

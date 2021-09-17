@@ -1189,7 +1189,7 @@ server <- function(input, output, session) {
                     selectInput('retador_habito',
                                 "Retador:",
                                 choices = c("", get_retadores_reto(reto = input$reto_habito) %>%
-                                        pull(nombre_retador))
+                                        pull(lista))
                                 )
                 )
             } else if (input$reto_habito == "") {

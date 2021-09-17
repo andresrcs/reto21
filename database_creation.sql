@@ -199,9 +199,7 @@ create table if not exists tbl_parametros (
 insert into tbl_parametros (nombre_parametro, unidad) 
 	values 
 		('Peso', 'Kg'),
-		('Medida Busto', 'cm'),
-		('Medida Cintura', 'cm'),
-		('Medida Cadera', 'cm');
+		('Medida Cintura', 'cm');
 
 -- Crear tbl_registro_parametros
 create table if not exists tbl_registros_parametros (
