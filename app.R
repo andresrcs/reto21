@@ -292,7 +292,9 @@ server <- function(input, output, session) {
                 num_celular_coach, email_coach, permiso, notificacion_correo) VALUES
                 ({data[row,]$nombre_coach},
                 {data[row,]$user_coach},
-                {sodium::password_store(data[row,]$password)},
+                {case_when(
+                    str_detect(data[row,]$password, '^[a-zA-Z0-9!¡/@#$¿?%^&*\"\\\\[\\\\]\\\\{\\\\}<>\\\\(\\\\)=\\\\-_´+`~:;,.€\\\\|]+$') ~ sodium::password_store(data[row,]$password),
+                    TRUE ~ data[row,]$password)},
                 {data[row,]$num_celular_coach},
                 {data[row,]$email_coach},
                 {data[row,]$permiso},
@@ -337,7 +339,10 @@ server <- function(input, output, session) {
             "UPDATE tbl_coaches SET
                 nombre_coach = {data[row,]$nombre_coach},
                 user_coach = {data[row,]$user_coach},
-                password = {if_else(grepl('^\\\\$7\\\\$C6\\\\.\\\\.\\\\.\\\\./\\\\.\\\\.\\\\.\\\\.', data[row,]$password), data[row,]$password, sodium::password_store(data[row,]$password))},
+                password = {case_when(
+                                str_detect(data[row,]$password, '^\\\\$7\\\\$C6\\\\.\\\\.\\\\.\\\\./\\\\.\\\\.\\\\.\\\\.') ~ data[row,]$password,
+                                str_detect(data[row,]$password, '^[a-zA-Z0-9!¡/@#$¿?%^&*\"\\\\[\\\\]\\\\{\\\\}<>\\\\(\\\\)=\\\\-_´+`~:;,.€\\\\|]+$') ~ sodium::password_store(data[row,]$password),
+                                TRUE ~ data[row,]$password)},
                 num_celular_coach = {data[row,]$num_celular_coach},
                 email_coach = {data[row,]$email_coach},
                 permiso = {data[row,]$permiso},
@@ -371,17 +376,37 @@ server <- function(input, output, session) {
                             input.choices = list('permiso' = enum$valor[enum$variable == 'permisos_coach']),
                             inputEvent = list(
                                 nombre_coach = function(x, value) {
-                                    if (!is.na(value) && nchar(value) < 4) {
+                                    if (!str_detect(value, "^.{3,}\\s.{3}")) {
                                         shinyFeedback::showFeedbackWarning(
                                             inputId = x,
-                                            text = "Nombre muy corto"
+                                            text = "Nombre inválido, ingrese como mínio un nombre y un apellido"
+                                        )
+                                    } else {
+                                        shinyFeedback::hideFeedback(x)
+                                    }
+                                },
+                                user_coach = function(x, value) {
+                                    if (nchar(value) < 4) {
+                                        shinyFeedback::showFeedbackWarning(
+                                            inputId = x,
+                                            text = "El usuario debe contener 4 caracteres como mínimo"
+                                        )
+                                    } else {
+                                        shinyFeedback::hideFeedback(x)
+                                    }
+                                },
+                                password = function(x, value) {
+                                    if (!str_detect(value, '^[a-zA-Z0-9!¡/@#$¿?%^&*"\\[\\]\\{\\}<>\\(\\)=\\-_´+`~:;,.€\\|]+$')) {
+                                        shinyFeedback::showFeedbackWarning(
+                                            inputId = x,
+                                            text = "El password no puede estar vacio o contener espacios"
                                         )
                                     } else {
                                         shinyFeedback::hideFeedback(x)
                                     }
                                 },
                                 num_celular_coach = function(x, value) {
-                                    if (!is.na(value) && !str_detect(value, '^\\d{9}$')) {
+                                    if (value != "" && !str_detect(value, '^\\d{9}$')) {
                                         shinyFeedback::showFeedbackWarning(
                                             inputId = x,
                                             text = "Número de celular inválido, el campo debe contener 9 números"
@@ -391,7 +416,7 @@ server <- function(input, output, session) {
                                     }
                                 },
                                 email_coach = function(x, value) {
-                                    if (!is.na(value) && !str_detect(value, '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+[.][A-Za-z]+$')) {
+                                    if (value != "" && !str_detect(value, '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+[.][A-Za-z]+$')) {
                                         shinyFeedback::showFeedbackWarning(
                                             inputId = x,
                                             text = "Email inválido"
@@ -446,9 +471,33 @@ server <- function(input, output, session) {
         )
     })
     
+    observeEvent(input$user_coach, {
+        value <- input$user_coach
+        if (nchar(value) < 4) {
+            shinyFeedback::showFeedbackWarning(
+                inputId = "user_coach",
+                text = "El usuario debe contener 4 caracteres como mínimo"
+            )
+        } else {
+            shinyFeedback::hideFeedback("user_coach")
+        }
+    })
+    
+    observeEvent(input$password, {
+        value <- input$password
+        if (!str_detect(value, '^[a-zA-Z0-9!¡/@#$¿?%^&*"\\[\\]\\{\\}<>\\(\\)=\\-_´+`~:;,.€\\|]+$')) {
+            shinyFeedback::showFeedbackWarning(
+                inputId = "password",
+                text = "El password no puede estar vacio o contener espacios"
+            )
+        } else {
+            shinyFeedback::hideFeedback("password")
+        }
+    })
+    
     observeEvent(input$num_celular_coach, {
         value <- input$num_celular_coach
-        if (!is.na(value) && !str_detect(value, '^\\d{9}$')) {
+        if (value != "" && !str_detect(value, '^\\d{9}$')) {
             shinyFeedback::showFeedbackWarning(
                 inputId = "num_celular_coach",
                 text = "Número de celular inválido, el campo debe contener 9 números"
@@ -460,7 +509,7 @@ server <- function(input, output, session) {
     
     observeEvent(input$email_coach, {
         value <- input$email_coach
-        if (!is.na(value) && !str_detect(value, '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+[.][A-Za-z]+$')) {
+        if (value != "" && !str_detect(value, '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+[.][A-Za-z]+$')) {
             shinyFeedback::showFeedbackWarning(
                 inputId = "email_coach",
                 text = "Email inválido"
@@ -475,7 +524,10 @@ server <- function(input, output, session) {
         sql_query <- glue_sql(
             "UPDATE tbl_coaches SET
                 user_coach = {input$user_coach},
-                password = {if_else(grepl('^\\\\$7\\\\$C6\\\\.\\\\.\\\\.\\\\./\\\\.\\\\.\\\\.\\\\.', input$password), input$password, sodium::password_store(input$password))},
+                password = {case_when(
+                                str_detect(input$password, '^\\\\$7\\\\$C6\\\\.\\\\.\\\\.\\\\./\\\\.\\\\.\\\\.\\\\.') ~ input$password,
+                                str_detect(input$password, '^[a-zA-Z0-9!¡/@#$¿?%^&*\"\\\\[\\\\]\\\\{\\\\}<>\\\\(\\\\)=\\\\-_´+`~:;,.€\\\\|]+$') ~ sodium::password_store(input$password),
+                                TRUE ~ input$password)},
                 num_celular_coach = {if_else(input$num_celular_coach != '', input$num_celular_coach, NA_character_)},
                 email_coach = {if_else(input$email_coach != '', input$email_coach, NA_character_)},
                 notificacion_correo = {input$notificacion_correo}
@@ -526,10 +578,11 @@ server <- function(input, output, session) {
                    across(where(is.numeric),  ~ ifelse(. == 0, NA, .)))
         
         sql_query <- glue_sql(
-            "INSERT INTO tbl_retadores (nombre_retador, fecha_nacimiento,
+            "INSERT INTO tbl_retadores (nombre_retador, fecha_nacimiento, sexo,
                 num_celular_retador, talla, nombre_coach) VALUES
                 ({data[row,]$nombre_retador},
                 {data[row,]$fecha_nacimiento},
+                {data[row,]$sexo},
                 {data[row,]$num_celular_retador},
                 {as.numeric(data[row,]$talla)},
                 {credentials()$info$nombre_coach})",
@@ -578,6 +631,7 @@ server <- function(input, output, session) {
             "UPDATE tbl_retadores SET
                 nombre_retador = {data[row,]$nombre_retador},
                 fecha_nacimiento = {data[row,]$fecha_nacimiento},
+                sexo = {data[row,]$sexo},
                 num_celular_retador = {data[row,]$num_celular_retador},
                 talla = {as.numeric(data[row,]$talla)}
             WHERE id_retador = {data[row,]$id_retador}",
@@ -605,20 +659,23 @@ server <- function(input, output, session) {
     retadores_result <- dtedit(input, output,
                              name = 'retadores',
                              thedata = tbl_retadores,
-                             edit.cols = c('nombre_retador', 'fecha_nacimiento',
+                             edit.cols = c('nombre_retador', 'fecha_nacimiento', 'sexo',
                                            'num_celular_retador', 'talla'),
-                             edit.label.cols = c('Nombres y Apellidos:', 'Fecha Nacimiento:',
+                             edit.label.cols = c('Nombres y Apellidos:', 'Fecha Nacimiento:', 'Sexo:',
                                                  'Celular:', 'Talla (m):'),
-                             input.types = c('fecha_nacimiento' = 'dateInput', 'talla' = 'numericInput'),
+                             input.types = c('fecha_nacimiento' = 'dateInput',
+                                             'sexo' = 'selectInput',
+                                             'talla' = 'numericInput'),
+                             input.choices = list('sexo' = enum$valor[enum$variable == 'sexos']),
                              view.cols = c('nombre_retador', 'num_celular_retador', 'nombre_coach'),
                              delete.info.label.cols = c('Nombre', 'Celular', 'Coach'),
                              show.copy = FALSE,
                              inputEvent = list(
                                  nombre_retador = function(x, value) {
-                                     if (!is.na(value) && nchar(value) < 4) {
+                                     if (!str_detect(value, "^.{3,}\\s.{3}")) {
                                          shinyFeedback::showFeedbackWarning(
                                              inputId = x,
-                                             text = "Nombre muy corto"
+                                             text = "Nombre inválido, ingrese como mínio un nombre y un apellido"
                                          )
                                      } else {
                                          shinyFeedback::hideFeedback(x)
@@ -635,7 +692,7 @@ server <- function(input, output, session) {
                                      }
                                  },
                                  num_celular_retador = function(x, value) {
-                                     if (!str_detect(value, '^\\d{9}$')) {
+                                     if (value != "" && !str_detect(value, '^\\d{9}$')) {
                                          shinyFeedback::showFeedbackWarning(
                                              inputId = x,
                                              text = "Número de celular inválido, el campo debe contener 9 números"
