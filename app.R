@@ -8,6 +8,18 @@ ui <- navbarPage(title = "RETO-21",
 )
 
 server <- function(input, output, session) {
+    # Check database connection ################################################
+    
+    if (!dbIsValid(con)) {
+        
+        con <- dbConnect(odbc::odbc(),
+                         .connection_string = "Driver={PostgreSQL ANSI};Uid=ubuntu;Database=herbalife;", 
+                         timeout = 10)
+        
+        dbSendStatement(con, "SET search_path = reto21")
+        
+    }
+    
     # Update functions #########################################################
     update_listas_retos <- function() {
         
@@ -169,7 +181,7 @@ server <- function(input, output, session) {
     }
     
     # Lo-gin logic ##############################################################
-    # hack to add the logout button to the navbar on app launch 
+    # Add the logout button to the navbar on app launch 
     insertUI(
         selector = ".navbar .container-fluid .navbar-collapse",
         ui = tags$ul(
@@ -1961,11 +1973,6 @@ server <- function(input, output, session) {
         }
     )
     
-    # Close app procedures #####################################################
-    
-    session$onSessionEnded(function() {
-        stopApp()
-    })
 }
 
 onStop(function() {
