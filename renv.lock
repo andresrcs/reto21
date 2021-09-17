@@ -126,6 +126,13 @@
       "Repository": "RSPM",
       "Hash": "648c5b3d71e6a37e3043617489a0a0e9"
     },
+    "calendar": {
+      "Package": "calendar",
+      "Version": "0.0.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "ab478f470a5203ff9990e42d916005b0"
+    },
     "callr": {
       "Package": "callr",
       "Version": "3.7.0",

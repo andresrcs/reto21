@@ -248,25 +248,25 @@ server <- function(input, output, session) {
         cal_proxy_toggle("resumen", setdiff(calendars, input$calendarId), toHide = TRUE)
     }, ignoreInit = TRUE, ignoreNULL = FALSE)
     
-    output$csv_calendario <- downloadHandler(
-        filename = paste0("calendario-", Sys.Date(), ".csv"),
+    output$ics_calendario <- downloadHandler(
+        filename = paste0("calendario-", Sys.Date(), ".ics"),
         content = function(file) {
             consulta_sql <- "
             select
             	tr.id_reto,
-            	actividad as \"Subject\",
-            	lower(tiempo_actividad)::date as \"Start Date\",
-            	lower(tiempo_actividad)::time as \"Start Time\",
-            	upper(tiempo_actividad)::date as \"End Date\",
-            	upper(tiempo_actividad)::time as \"End Time\",
-            	tr.nombre_reto || '\n' || tema_actividad || '\n' || ta.coach_expositor as \"Description\",
-            	'Zoom' as \"Location\"
+                actividad as \"SUMMARY\",
+                tr.nombre_reto || '\\n - ' || tema_actividad || '\\n - ' || ta.coach_expositor as \"DESCRIPTION\",
+            	lower(tiempo_actividad) as \"DTSTART\",
+            	upper(tiempo_actividad) as \"DTEND\",
+            	'Zoom' as \"LOCATION\",
+                tr.nombre_reto || '-' || actividad || '-' || lower(tiempo_actividad) as \"UID\"
             from tbl_actividades ta inner join tbl_retos tr on ta.nombre_reto = tr.nombre_reto
             where tr.reto_activo = true"
             res <- dbGetQuery(con, consulta_sql) %>% 
-                filter(id_reto %in% input$calendarId) %>% 
+                filter(id_reto %in% input$calendarId) %>%
                 select(-id_reto)
-            write.csv(res, file)
+            
+            ic_write(ical(res), file)
         }
     )
     
@@ -434,6 +434,30 @@ server <- function(input, output, session) {
         )
     })
     
+    observeEvent(input$num_celular_coach, {
+        value <- input$num_celular_coach
+        if (!is.na(value) && !str_detect(value, '^\\d{9}$')) {
+            shinyFeedback::showFeedbackWarning(
+                inputId = "num_celular_coach",
+                text = "Número de celular inválido, el campo debe contener 9 números"
+            )
+        } else {
+            shinyFeedback::hideFeedback("num_celular_coach")
+        }
+    })
+    
+    observeEvent(input$email_coach, {
+        value <- input$email_coach
+        if (!is.na(value) && !str_detect(value, '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+[.][A-Za-z]+$')) {
+            shinyFeedback::showFeedbackWarning(
+                inputId = "email_coach",
+                text = "Email inválido"
+            )
+        } else {
+            shinyFeedback::hideFeedback("email_coach")
+        }
+    })
+    
     observeEvent(input$guardar_coach, {
         req(input$user_coach, input$password)
         sql_query <- glue_sql(
@@ -469,7 +493,6 @@ server <- function(input, output, session) {
             updateTextInput(session, inputId = "num_celular_coach", value = datos_coach$num_celular_coach)
             updateTextInput(session, inputId = "email_coach", value = datos_coach$email_coach)
             updateCheckboxInput(session, inputId = "notificacion_correo", value = datos_coach$notificacion_correo)
-            update_lista_coaches()
             showNotification("Modificaciones guardadas", duration = 3, closeButton = TRUE, type = "message")
         }
     })
@@ -1786,7 +1809,7 @@ server <- function(input, output, session) {
         
         output$boton_detalle_reto <- renderUI({
             if (input$reto_resultados != "") {
-                downloadButton("detalle_reto", label = "Reporte Detallado")
+                downloadButton("detalle_reto", label = "Reporte Detallado Reto")
             } else if (input$reto_resultados == "") {
                 return()
             }
@@ -1910,7 +1933,7 @@ server <- function(input, output, session) {
                     theme(legend.position = "bottom")
             })
             
-            output$boton_detalle_retador <- renderUI({downloadButton("detalle_retador", label = "Reporte Detallado")})
+            output$boton_detalle_retador <- renderUI({downloadButton("detalle_retador", label = "Reporte Detallado Retador")})
             
         } else if (input$reto_resultados == "" | input$retador_resultados == "") {
             updateSelectInput(session = session, "retador_resultados", selected = "")

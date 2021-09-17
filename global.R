@@ -2,6 +2,7 @@
 library(shiny)
 library(shinythemes)
 library(shinyauthr)
+library(calendar)
 library(odbc)
 library(dbx)
 library(DT)

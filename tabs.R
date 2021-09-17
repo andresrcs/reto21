@@ -36,7 +36,7 @@ resumen <- tabPanel(title = icon("home"),
                                            pull(lista)
                                    )),
                             column(width = 2,
-                                   downloadButton("csv_calendario", "Exportar"))
+                                   downloadButton("ics_calendario", "Exportar"))
                         )
                     )
 )
