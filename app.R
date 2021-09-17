@@ -335,6 +335,38 @@ server <- function(input, output, session) {
                                                 'Notificación email'),
                             input.types = c('permiso' = 'selectInput'),
                             input.choices = list('permiso' = enum$valor[enum$variable == 'permisos_coach']),
+                            inputEvent = list(
+                                nombre_coach = function(x, value) {
+                                    if (!is.na(value) && nchar(value) < 4) {
+                                        shinyFeedback::showFeedbackWarning(
+                                            inputId = x,
+                                            text = "Nombre muy corto"
+                                        )
+                                    } else {
+                                        shinyFeedback::hideFeedback(x)
+                                    }
+                                },
+                                num_celular_coach = function(x, value) {
+                                    if (!is.na(value) && !str_detect(value, '^\\d{9}$')) {
+                                        shinyFeedback::showFeedbackWarning(
+                                            inputId = x,
+                                            text = "Número de celular inválido, el campo debe contener 9 números"
+                                        )
+                                    } else {
+                                        shinyFeedback::hideFeedback(x)
+                                    }
+                                },
+                                email_coach = function(x, value) {
+                                    if (!is.na(value) && !str_detect(value, '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+[.][A-Za-z]+$')) {
+                                        shinyFeedback::showFeedbackWarning(
+                                            inputId = x,
+                                            text = "Email inválido"
+                                        )
+                                    } else {
+                                        shinyFeedback::hideFeedback(x)
+                                    }
+                                }
+                            ),
                             view.cols = c('nombre_coach', 'user_coach', 'permiso'),
                             delete.info.label.cols = c('Nombre', 'Usuario', 'Permiso'),
                             show.copy = FALSE, 
@@ -523,7 +555,49 @@ server <- function(input, output, session) {
                              input.types = c('fecha_nacimiento' = 'dateInput', 'talla' = 'numericInput'),
                              view.cols = c('nombre_retador', 'num_celular_retador', 'nombre_coach'),
                              delete.info.label.cols = c('Nombre', 'Celular', 'Coach'),
-                             show.copy = FALSE, 
+                             show.copy = FALSE,
+                             inputEvent = list(
+                                 nombre_retador = function(x, value) {
+                                     if (!is.na(value) && nchar(value) < 4) {
+                                         shinyFeedback::showFeedbackWarning(
+                                             inputId = x,
+                                             text = "Nombre muy corto"
+                                         )
+                                     } else {
+                                         shinyFeedback::hideFeedback(x)
+                                     }
+                                 },
+                                 talla = function(x, value) {
+                                     if (!is.na(value) && (value < 0 || value > 2)) {
+                                         shinyFeedback::showToast("error", "Valor de talla inválido (talla debe estar en metros y ser un número positivo entre 0 y 2)")
+                                         shiny::updateNumericInput(
+                                             session = shiny::getDefaultReactiveDomain(),
+                                             inputId = x,
+                                             value = NA
+                                         )
+                                     }
+                                 },
+                                 num_celular_retador = function(x, value) {
+                                     if (!str_detect(value, '^\\d{9}$')) {
+                                         shinyFeedback::showFeedbackWarning(
+                                             inputId = x,
+                                             text = "Número de celular inválido, el campo debe contener 9 números"
+                                         )
+                                     } else {
+                                         shinyFeedback::hideFeedback(x)
+                                     }
+                                 },
+                                 fecha_nacimiento = function(x, value) {
+                                     if (as.numeric(difftime(Sys.Date(), as.Date(value))) / 360 < 18) {
+                                         shinyFeedback::showFeedbackWarning(
+                                             inputId = x,
+                                             text = "Menor de 18 años"
+                                         )
+                                     } else {
+                                         shinyFeedback::hideFeedback(x)
+                                     }
+                                 }
+                                 ),
                              title.delete = "Eliminar Retador",
                              title.edit = "Modificar Informacion de Retador",
                              title.add = "Agregar Retador",

@@ -593,6 +593,13 @@
       "Repository": "RSPM",
       "Hash": "f895dafd39733c4a70d425f605a832e7"
     },
+    "shinyFeedback": {
+      "Package": "shinyFeedback",
+      "Version": "0.3.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "6659e386a388a84ee2749e0d15e6934b"
+    },
     "shinyauthr": {
       "Package": "shinyauthr",
       "Version": "1.0.0",

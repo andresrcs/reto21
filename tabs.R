@@ -41,6 +41,7 @@ resumen <- tabPanel(title = icon("home"),
 
 retadores <- tabPanel("Retadores",
                       fluidPage(
+                          shinyFeedback::useShinyFeedback(),
                           h1("Registro General de Retadores"),
                           uiOutput('retadores')
                       )
