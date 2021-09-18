@@ -1551,7 +1551,8 @@ server <- function(input, output, session) {
             output$img <- renderImage({
                 
                 tmp <-  image_read(input$upload$datapath) %>%
-                    image_resize("300x") %>% 
+                    image_resize("300x") %>%
+                    image_annotate(format(Sys.time() - hours(5), "%d/%m/%Y %H:%M"), size = 20, gravity = "southwest", color = "red") %>%
                     image_write(tempfile(fileext='jpg'), format = 'jpg')
 
                 list(src = tmp, contentType = "image/jpeg")
@@ -1565,6 +1566,7 @@ server <- function(input, output, session) {
         req(input$reto_foto, input$retador_foto, input$tipo, input$estado)
         tmp <-  image_read(input$upload$datapath) %>%
             image_resize("300x") %>% 
+            image_annotate(format(Sys.time() - hours(5), "%d/%m/%Y %H:%M"), size = 20, gravity = "southwest", color = "red") %>%
             image_write(tempfile(fileext='jpg'), format = 'jpg')
         image_raw <- readRaw(file = tmp)
         image_raw <- image_raw$fileRaw
@@ -1740,7 +1742,7 @@ server <- function(input, output, session) {
                            paste(collapse = "")) %>%
                 mutate(archivo = list(to_bin(archivo))) %>%
                 mutate(archivo = archivo %>% 
-                           image_read() %>% 
+                           image_read() %>%
                            image_write(path = paste0("www/",tipo,"_",estado,"_",id_participacion,".jpg"), format = 'jpg'),
                        archivo = paste0('<img src=', stringr::str_remove(archivo, "www/"), '></img>')) %>%
                 pivot_wider(names_from = estado, values_from = archivo, id_cols = tipo)
