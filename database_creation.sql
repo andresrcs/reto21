@@ -17,7 +17,7 @@ create table if not exists tbl_coaches (
     permiso permisos_coach not null default 'Coach'::permisos_coach,
     notificacion_correo boolean not null default false,
     constraint nombre_valido check (nombre_coach ~ '^.{3,}\s.{3}'),
-    constraint usuario_valido check (user_coach ~ '.{4,}'),
+    constraint usuario_valido check (user_coach ~ '^[a-zA-Z0-9!¡/@#$¿?%^&*"\[\]\{\}<>\(\)=\-_´+`~:;,.€\|]{4,}$'),
     constraint password_valido check (password ~ '^[a-zA-Z0-9!¡/@#$¿?%^&*"\[\]\{\}<>\(\)=\-_´+`~:;,.€\|]+$'),
     constraint celular_valido check (num_celular_coach ~ '^\d{9}$'),
     constraint email_valido check (email_coach ~* '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+[.][A-Za-z]+$')

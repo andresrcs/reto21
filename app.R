@@ -99,7 +99,7 @@ server <- function(input, output, session) {
         )
         
         updateSelectInput(session = session,
-                          'reto_actividades',
+                          'reto_reg_actividad',
                           selected = ""
         )
         
@@ -386,10 +386,10 @@ server <- function(input, output, session) {
                                     }
                                 },
                                 user_coach = function(x, value) {
-                                    if (nchar(value) < 4) {
+                                    if (!str_detect(value, '^[a-zA-Z0-9!¡/@#$¿?%^&*"\\[\\]\\{\\}<>\\(\\)=\\-_´+`~:;,.€\\|]{4,}$')) {
                                         shinyFeedback::showFeedbackWarning(
                                             inputId = x,
-                                            text = "El usuario debe contener 4 caracteres como mínimo"
+                                            text = "El usuario debe contener 4 caracteres como mínimo y no contener espacios"
                                         )
                                     } else {
                                         shinyFeedback::hideFeedback(x)
@@ -473,10 +473,10 @@ server <- function(input, output, session) {
     
     observeEvent(input$user_coach, {
         value <- input$user_coach
-        if (nchar(value) < 4) {
+        if (!str_detect(value, '^[a-zA-Z0-9!¡/@#$¿?%^&*"\\[\\]\\{\\}<>\\(\\)=\\-_´+`~:;,.€\\|]{4,}$')) {
             shinyFeedback::showFeedbackWarning(
                 inputId = "user_coach",
-                text = "El usuario debe contener 4 caracteres como mínimo"
+                text = "El usuario debe contener 4 caracteres como mínimo y no contener espacios"
             )
         } else {
             shinyFeedback::hideFeedback("user_coach")
@@ -520,7 +520,6 @@ server <- function(input, output, session) {
     })
     
     observeEvent(input$guardar_coach, {
-        req(input$user_coach, input$password)
         sql_query <- glue_sql(
             "UPDATE tbl_coaches SET
                 user_coach = {input$user_coach},
@@ -544,19 +543,20 @@ server <- function(input, output, session) {
                 }
             )
         
-        if (success) {
-            sql_query <- glue_sql(
-                "SELECT *
+        sql_query <- glue_sql(
+            "SELECT *
                 FROM tbl_coaches
                 WHERE id_coach = {credentials()$info$id_coach}")
-            datos_coach <- dbGetQuery(con, sql_query) %>%
-                mutate(across(starts_with("notificacion"), ~ as.logical(as.numeric(.))))
-            
-            updateTextInput(session, inputId = "user_coach", value = datos_coach$user_coach)
-            updateTextInput(session, inputId = "password", value = datos_coach$password)
-            updateTextInput(session, inputId = "num_celular_coach", value = datos_coach$num_celular_coach)
-            updateTextInput(session, inputId = "email_coach", value = datos_coach$email_coach)
-            updateCheckboxInput(session, inputId = "notificacion_correo", value = datos_coach$notificacion_correo)
+        datos_coach <- dbGetQuery(con, sql_query) %>%
+            mutate(across(starts_with("notificacion"), ~ as.logical(as.numeric(.))))
+        
+        updateTextInput(session, inputId = "user_coach", value = datos_coach$user_coach)
+        updateTextInput(session, inputId = "password", value = datos_coach$password)
+        updateTextInput(session, inputId = "num_celular_coach", value = datos_coach$num_celular_coach)
+        updateTextInput(session, inputId = "email_coach", value = datos_coach$email_coach)
+        updateCheckboxInput(session, inputId = "notificacion_correo", value = datos_coach$notificacion_correo)
+        
+        if (success) {
             showNotification("Modificaciones guardadas", duration = 3, closeButton = TRUE, type = "message")
         }
     })
@@ -598,6 +598,10 @@ server <- function(input, output, session) {
             }
         )
         update_listas_retadores()
+        updateSelectInput(session = session,
+                          'reto_participacion',
+                          selected = ""
+        )
         return(get_retadores())
     }
     
@@ -620,6 +624,10 @@ server <- function(input, output, session) {
             }
         )
         update_listas_retadores()
+        updateSelectInput(session = session,
+                          'reto_participacion',
+                          selected = ""
+        )
         return(get_retadores())
     }
     
@@ -651,6 +659,10 @@ server <- function(input, output, session) {
             }
         )
         update_listas_retadores()
+        updateSelectInput(session = session,
+                          'reto_participacion',
+                          selected = ""
+        )
         return(get_retadores())
     }
     
@@ -1121,9 +1133,7 @@ server <- function(input, output, session) {
     )
     
     observeEvent(input$reto_participacion, {
-        #req(input$reto_participacion)
         tbl_participaciones(get_participaciones(reto = input$reto_participacion))
-        update_listas_retadores()
     })
     # Tab Parametros ###########################################################
     get_parametros <- function (id_participacion) {
