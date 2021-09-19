@@ -1154,9 +1154,14 @@ server <- function(input, output, session) {
         return(res)
     }
     
-    tbl_parametros <- reactiveVal(
-        get_parametros(0)
+    parametros_empty_template <- data.frame(
+        Parametro = NA_character_,
+        Inicial = NA_real_,
+        Final = NA_real_,
+        Und = NA_character_
     )
+    
+    tbl_parametros <- reactiveVal(parametros_empty_template)
     
     parametros_data_update <- dataEditServer("parametros",
                                   data = reactive(tbl_parametros()),
@@ -1190,6 +1195,7 @@ server <- function(input, output, session) {
         },
         {
         req(input$retador_parametros)
+        tbl_parametros(parametros_empty_template) # Force control update
         tbl_parametros(get_parametros(id_participacion = get_id_participacion(input$reto_parametros, input$retador_parametros)))
         
         output$controles_parametros <- renderUI({
@@ -1261,9 +1267,13 @@ server <- function(input, output, session) {
         return(res)
     }
     
-    tbl_habitos <- reactiveVal(
-        get_habitos(0, '0001-01-01')
+    habitos_empty_template <- data.frame(
+        Hábito = NA_character_,
+        Registro = FALSE,
+        Coach = NA_character_
     )
+    
+    tbl_habitos <- reactiveVal(habitos_empty_template)
     
     habitos_data_update <- dataEditServer("habitos",
                                           data = reactive(tbl_habitos()),
@@ -1307,6 +1317,7 @@ server <- function(input, output, session) {
     },
     {
         req(input$retador_habito)
+        tbl_habitos(habitos_empty_template) # Force control update
         tbl_habitos(get_habitos(id_participacion = get_id_participacion(input$reto_habito, input$retador_habito),
                                 fecha = input$fecha_habito))
         
@@ -1393,14 +1404,14 @@ server <- function(input, output, session) {
         return(res)
     }
     
-    tbl_reg_actividades <- reactiveVal(
-        data.frame(
-            id = 0,
-            Retador = "",
-            Registro = "",
-            Coach = ""
-        )
+    actividades_empty_template <- data.frame(
+        id = NA_integer_,
+        Retador = NA_character_,
+        Registro = NA,
+        Coach = NA_character_
     )
+    
+    tbl_reg_actividades <- reactiveVal(actividades_empty_template)
     
     actividades_data_update <- dataEditServer("reg_actividades",
                                           data = reactive(tbl_reg_actividades()),
@@ -1434,6 +1445,7 @@ server <- function(input, output, session) {
     {
         req(input$reto_reg_actividad, input$id_actividad)
         
+        tbl_reg_actividades(actividades_empty_template) # Force control update
         tbl_reg_actividades(get_reg_actividades(reto = input$reto_reg_actividad,
                                                 id_actividad = input$id_actividad))
         
@@ -1519,8 +1531,7 @@ server <- function(input, output, session) {
         input$retador_foto
     },
     {
-        req(input$reto_foto)
-        
+        output$img <- renderImage({list(src = "", contentType = "image/jpeg")}, deleteFile=FALSE)
         output$controles_foto <- renderUI({
             if (input$reto_foto != "" & input$retador_foto != "") {
                 tagList(
@@ -1546,20 +1557,55 @@ server <- function(input, output, session) {
         })
     })
     
+    observeEvent(
+        {
+            input$tipo
+            input$estado
+        },
+        {
+            req(input$tipo, input$estado)
+            
+            output$img <- renderImage({
+                tmp <- ""
+                consulta_sql<- glue("
+                SELECT
+                    archivo
+                from
+                    tbl_fotos
+                where
+                    id_participacion = {get_id_participacion(input$reto_foto, input$retador_foto)} and
+                    tipo = '{input$tipo}' and
+                    estado = '{input$estado}'")
+                res <- dbGetQuery(con, consulta_sql) 
+                
+                if (nrow(res) > 0) {
+                    tmp <- res %>%
+                        rowwise() %>%
+                        mutate(archivo = archivo %>% 
+                                   paste(collapse = "")) %>%
+                        mutate(archivo = list(to_bin(archivo))) %>%
+                        mutate(archivo = archivo %>% 
+                                   image_read() %>%
+                                   image_write(tempfile(fileext='.jpg'), format = 'jpg')) %>% 
+                        pull(archivo)
+                }
+                
+                list(src = tmp, contentType = "image/jpeg")
+            }, deleteFile = TRUE)
+        }
+    )
+    
     observeEvent(input$upload, {
         if (length(input$upload$datapath)) {
             output$img <- renderImage({
-                
                 tmp <-  image_read(input$upload$datapath) %>%
                     image_resize("300x") %>%
                     image_annotate(format(Sys.time() - hours(5), "%d/%m/%Y %H:%M"), size = 20, gravity = "southwest", color = "red") %>%
-                    image_write(tempfile(fileext='jpg'), format = 'jpg')
-
-                list(src = tmp, contentType = "image/jpeg")
+                    image_write(tempfile(fileext='.jpg'), format = 'jpg')
                 
-            },  deleteFile=FALSE)  
+                list(src = tmp, contentType = "image/jpeg")
+            }, deleteFile=FALSE)  
         }
-        
     })
     
     observeEvent(input$guardar_foto, {
@@ -1630,20 +1676,18 @@ server <- function(input, output, session) {
         return(res)
     }
     
-    to_bin <- function(raw) {
-        as.raw(strtoi(substring(raw, seq(1,nchar(raw), by=2),
-                                seq(2,nchar(raw), by=2)),
-                      base=16))
-    }
-    
-    tbl_calificaciones <- reactiveVal(
-        get_calificaciones(0, "")
+    calificaciones_empty_template <- data.frame(
+        Criterio = NA_character_,
+        Calificación = NA_character_
     )
+    
+    tbl_calificaciones <- reactiveVal(calificaciones_empty_template)
     
     calificaciones_data_update <- dataEditServer("calificaciones",
                                              data = reactive(tbl_calificaciones()),
                                              col_readonly = c('Criterio'),
-                                             col_options = list(Calificación = c("Mucho Peor",
+                                             col_options = list(Calificación = c(NA_character_,
+                                                                                 "Mucho Peor",
                                                                                  "Peor",
                                                                                  "Igual",
                                                                                  "Mejor",
@@ -1676,7 +1720,9 @@ server <- function(input, output, session) {
     },
     {
         req(input$retador_calificacion)
+        
         id_participacion = get_id_participacion(input$reto_calificacion, input$retador_calificacion)
+        tbl_calificaciones(calificaciones_empty_template) # Force control update
         tbl_calificaciones(get_calificaciones(id_participacion, credentials()$info$nombre_coach))
         
         output$controles_calificacion <- renderUI({
@@ -1755,12 +1801,13 @@ server <- function(input, output, session) {
         db <- dbxConnect(adapter="postgres", dbname="herbalife", user = "ubuntu", variables=list(search_path="reto21"))
         
         success <- tryCatch({
+            current_id = get_id_participacion(input$reto_calificacion, input$retador_calificacion)
             dbxUpsert(db,
                       "tbl_registros_calificaciones",
                       records = calificaciones_data_update() %>%
                           rename(criterio_calificacion = Criterio,
                                  calificacion = Calificación) %>% 
-                          mutate(id_participacion = get_id_participacion(input$reto_calificacion, input$retador_calificacion),
+                          mutate(id_participacion = current_id,
                                  nombre_coach = credentials()$info$nombre_coach,
                                  calificacion = case_when(
                                      calificacion == "Mucho Peor" ~ -2,
@@ -1773,6 +1820,14 @@ server <- function(input, output, session) {
                           drop_na(calificacion) %>% 
                           select(id_participacion, nombre_coach, criterio_calificacion, calificacion),
                       where_cols = c("id_participacion", "nombre_coach", "criterio_calificacion"))
+            
+            dbxDelete(db,
+                      "tbl_registros_calificaciones",
+                      where = calificaciones_data_update() %>%
+                          filter(is.na(Calificación)) %>% 
+                          mutate(id_participacion = current_id,
+                                 nombre_coach = credentials()$info$nombre_coach) %>% 
+                          select(id_participacion, nombre_coach))
             TRUE
         },
         error = function(cond) {

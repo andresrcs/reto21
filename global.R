@@ -156,6 +156,12 @@ get_id_participacion <- function (reto, retador) {
     return(res)
 }
 
+to_bin <- function(raw) {
+    as.raw(strtoi(substring(raw, seq(1,nchar(raw), by=2),
+                            seq(2,nchar(raw), by=2)),
+                  base=16))
+}
+
 consulta_sql <- "
 SELECT
     type.typname AS variable,
