@@ -222,9 +222,9 @@ server <- function(input, output, session) {
             appendTab("tabs", participaciones)
             appendTab("tabs", navbarMenu("Registros",
                                          parametros,
+                                         fotos,
                                          habitos,
-                                         reg_actividades,
-                                         fotos)
+                                         reg_actividades)
                       )
             appendTab("tabs", calificaciones)
             appendTab("tabs", resultados)
