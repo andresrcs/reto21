@@ -61,7 +61,7 @@ create table if not exists tbl_retadores (
 		references tbl_coaches (nombre_coach)
 		on update cascade on delete restrict,
 	constraint nombre_valido check (nombre_retador ~ '^.{3,}\s.{3}'),
-    constraint celular_valido check (num_celular_retador ~ '^\d{9}$'),
+    constraint celular_valido check (num_celular_retador ~ '^\d{9}$')
 );
    
 create index if not exists tbl_retadores_fki_nombre_coach

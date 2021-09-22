@@ -41,13 +41,15 @@ consulta_sql <- glue_sql("
     	tp.nombre_retador = {params$retador}
     order by th.id_habito, fecha_ocurrencia", .con = con)
 res <- dbGetQuery(con, consulta_sql)
-res %>% 
+if (nrow(res) > 0) {
+    res %>% 
     pivot_wider(names_from = nombre_habito, values_from = user_coach, id_cols = fecha_ocurrencia) %>% 
     rename(Fecha = fecha_ocurrencia) %>%
     arrange(Fecha) %>% 
     mutate(Fecha = format(Fecha, "%d/%m/%Y")) %>% 
     kbl() %>% 
     kable_paper("striped", full_width = T)
+}
 ```
 ## Registro de Asistencia a Actividades
 
@@ -63,12 +65,14 @@ consulta_sql <- glue_sql("
   where tp.nombre_reto = {params$reto} and tp.nombre_retador = {params$retador}
   order by fecha", .con = con)
 res <- dbGetQuery(con, consulta_sql)
-res %>% 
+if (nrow(res) > 0) {
+    res %>% 
   mutate(Actividad = paste(actividad, format(as.Date(fecha), "%d/%m/%Y"))) %>% 
   select(Actividad, Registrador = nombre_coach) %>% 
   kbl() %>% 
   kable_paper("striped", full_width = T) %>%
   collapse_rows(columns = 2, valign = "middle")
+}
 ```
 
 ## Calificaciones
@@ -85,7 +89,8 @@ consulta_sql <- glue_sql("
 	where tp.nombre_reto = {params$reto} and tp.nombre_retador = {params$retador}
 	order by criterio_calificacion, nombre_coach", .con = con)
 res <- dbGetQuery(con, consulta_sql)
-res %>% 
+if (nrow(res) > 0) {
+    res %>% 
   mutate(calificacion = case_when(
                 calificacion == -2 ~ "Mucho Peor",
                 calificacion == -1 ~ "Peor",
@@ -101,6 +106,7 @@ res %>%
   kable_paper("striped", full_width = T) %>%
   column_spec(1, bold = T) %>%
   collapse_rows(columns = 1:2, valign = "top")
+}
 ```
 
 ```{r disconnect}
