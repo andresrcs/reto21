@@ -1676,6 +1676,18 @@ server <- function(input, output, session) {
         return(res)
     }
     
+    get_talla <- function(retador) {
+        consulta_sql <- glue_sql("
+        select 
+        	talla
+        from tbl_retadores
+        where nombre_retador = {retador}",
+        .con = con)
+        res <- dbGetQuery(con, consulta_sql) %>% 
+            pull(talla)
+        return(res)
+    }
+    
     calificaciones_empty_template <- data.frame(
         Criterio = NA_character_,
         Calificación = NA_character_
@@ -1767,8 +1779,19 @@ server <- function(input, output, session) {
             paste("Edad:", edad)
         })
         
+        output$talla <- renderText({
+            paste("Talla:", get_talla(input$retador_calificacion), "m")
+        })
+        
         output$parametros <- renderTable({
-            get_parametros(id_participacion)
+            parametros_retador <- get_parametros(id_participacion)
+            
+            parametros_retador <- parametros_retador %>% 
+                filter(Parametro == 'Peso') %>% 
+                mutate(Parametro = 'IMC',
+                       across(where(is.numeric), ~ round(./get_talla(input$retador_calificacion) ^ 2, 2)),
+                       Und = '') %>% 
+                bind_rows(parametros_retador)
         })
         
         output$fotos <- renderTable({

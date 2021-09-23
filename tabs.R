@@ -141,6 +141,7 @@ calificaciones <- tabPanel("Calificaciones",
                              mainPanel(
                                  h3(textOutput("objetivo")),
                                  h3(textOutput("edad")),
+                                 h3(textOutput("talla")),
                                  tableOutput("parametros"),
                                  tableOutput("fotos")
                              )
