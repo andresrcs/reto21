@@ -2085,7 +2085,7 @@ server <- function(input, output, session) {
                 
                 plot_data %>% 
                     ggplot(aes(x = fecha_ocurrencia, y = puntaje, fill = concepto)) +
-                    geom_col(position = "stack") +
+                    geom_col(position = "stack", width = 0.9) +
                     geom_text(aes(label = round(total, 2), y = total), vjust = -0.5) +
                     coord_cartesian(clip = "off") +
                     scale_x_date(date_breaks = "1 day",
