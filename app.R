@@ -233,7 +233,8 @@ server <- function(input, output, session) {
                 appendTab("tabs", navbarMenu("Configuración",
                                              actividades,
                                              retos,
-                                             coaches
+                                             coaches,
+                                             pesos
                                              )
                           )
             } else if (credentials()$info$permiso == "Coach") {
@@ -2126,6 +2127,384 @@ server <- function(input, output, session) {
         }
     )
     
+    # Tab Pesos y Parametros ###################################################
+    # Conceptos
+    get_tbl_conceptos <- function() {
+        sql_query <- glue_sql(
+            "select *
+            from tbl_conceptos",
+            .con = con
+        )
+        res <- dbGetQuery(con, sql_query)
+        return(res)
+    }
+    
+    tbl_conceptos_update_callback <- function(data, olddata, row) {
+        sql_query <- glue_sql(
+            "UPDATE tbl_conceptos SET
+                peso_concepto = {data[row,]$peso_concepto}
+            WHERE id_concepto = {data[row,]$id_concepto}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_tbl_conceptos())
+    }
+    
+    tbl_conceptos <- get_tbl_conceptos()
+    
+    conceptos_result <- dtedit(input, output,
+                               name = 'tbl_conceptos',
+                               thedata = tbl_conceptos,
+                               edit.cols = c('peso_concepto'),
+                               edit.label.cols = c('Peso Concepto'),
+                               input.types = c('peso_concepto' = 'numericInput'),
+                               view.cols = c('concepto', 'peso_concepto'),
+                               show.copy = FALSE,
+                               show.delete = FALSE,
+                               show.insert = FALSE,
+                               title.edit = "Modificar Peso de Concepto",
+                               label.edit = "Modificar",
+                               label.cancel = "Cancelar",
+                               label.save = "Guardar",
+                               callback.update = tbl_conceptos_update_callback,
+                               icon.edit = shiny::icon("edit"),
+                               datatable.call = function(...) {
+                                   DT::datatable(...) %>%
+                                       formatStyle(
+                                           'concepto',
+                                           fontWeight = 'bold'
+                                       )
+                               },
+                               datatable.options = list(columns = list(
+                                   list(title = 'Concepto'),
+                                   list(title = 'Peso Concepto')))
+    )
+    
+    # Habitos
+    get_tbl_habitos <- function() {
+        sql_query <- glue_sql(
+            "select *
+            from tbl_habitos",
+            .con = con
+        )
+        res <- dbGetQuery(con, sql_query)
+        return(res)
+    }
+    
+    tbl_habitos_insert_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "INSERT INTO tbl_habitos (nombre_habito, peso_habito) VALUES
+                ({data[row,]$nombre_habito},
+                {data[row,]$peso_habito})",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_tbl_habitos())
+    }
+    
+    tbl_habitos_delete_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "DELETE FROM tbl_habitos WHERE id_habito = {data[row,]$id_habito}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_tbl_habitos())
+    }
+    
+    tbl_habitos_update_callback <- function(data, olddata, row) {
+        sql_query <- glue_sql(
+            "UPDATE tbl_habitos SET
+                nombre_habito = {data[row,]$nombre_habito},
+                peso_habito = {data[row,]$peso_habito}
+            WHERE id_habito = {data[row,]$id_habito}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_tbl_habitos())
+    }
+    
+    tbl_habitos_pesos <- get_tbl_habitos()
+    
+    tbl_habitos_pesos_result <- dtedit(input, output,
+                                       name = 'tbl_habitos',
+                                       thedata = tbl_habitos_pesos,
+                                       edit.cols = c('nombre_habito', 'peso_habito'),
+                                       edit.label.cols = c('Hábito', 'Peso Hábito'),
+                                       input.types = c('peso_habito' = 'numericInput'),
+                                       view.cols = c('nombre_habito', 'peso_habito'),
+                                       delete.info.label.cols = c('Hábito', 'Peso Hábito'),
+                                       show.copy = FALSE, 
+                                       title.delete = "Eliminar Hábito",
+                                       title.edit = "Modificar Informacion de Hábito",
+                                       title.add = "Agregar Hábito",
+                                       label.add = "Agregar",
+                                       label.edit = "Modificar",
+                                       label.delete = "Eliminar",
+                                       label.cancel = "Cancelar",
+                                       label.save = "Guardar",
+                                       text.delete.modal = "¿Está seguro de que quiere eliminar este hábito? Sólo se puede eliminar hábitos sin registros guardados",
+                                       callback.insert = tbl_habitos_insert_callback,
+                                       callback.delete = tbl_habitos_delete_callback,
+                                       callback.update = tbl_habitos_update_callback,
+                                       icon.add = shiny::icon("plus"),
+                                       icon.delete = shiny::icon("trash"), 
+                                       icon.edit = shiny::icon("edit"),
+                                       datatable.call = function(...) {
+                                           DT::datatable(...) %>%
+                                               formatStyle(
+                                                   'nombre_habito',
+                                                   fontWeight = 'bold'
+                                               )
+                                       },
+                                       datatable.options = list(columns = list(
+                                           list(title = 'Hábito'),
+                                           list(title = 'Peso Hábito')))
+    )
+    
+    # Criterio de Calificacion
+    get_tbl_criterios <- function() {
+        sql_query <- glue_sql(
+            "select *
+            from tbl_criterios_calificacion",
+            .con = con
+        )
+        res <- dbGetQuery(con, sql_query)
+        return(res)
+    }
+    
+    tbl_criterios_insert_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "INSERT INTO tbl_criterios_calificacion (criterio_calificacion, peso_criterio) VALUES
+                ({data[row,]$criterio_calificacion},
+                {data[row,]$peso_criterio})",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_tbl_criterios())
+    }
+    
+    tbl_criterios_delete_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "DELETE FROM tbl_criterios_calificacion 
+            WHERE id_criterio_calificacion = {data[row,]$id_criterio_calificacion}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_tbl_criterios())
+    }
+    
+    tbl_criterios_update_callback <- function(data, olddata, row) {
+        sql_query <- glue_sql(
+            "UPDATE tbl_criterios_calificacion SET
+                criterio_calificacion = {data[row,]$criterio_calificacion},
+                peso_criterio = {data[row,]$peso_criterio}
+            WHERE id_criterio_calificacion = {data[row,]$id_criterio_calificacion}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_tbl_criterios())
+    }
+    
+    tbl_criterios <- get_tbl_criterios()
+    
+    tbl_criterios_result <- dtedit(input, output,
+                                   name = 'tbl_criterios',
+                                   thedata = tbl_criterios,
+                                   edit.cols = c('criterio_calificacion', 'peso_criterio'),
+                                   edit.label.cols = c('Criterio', 'Peso Criterio'),
+                                   input.types = c('peso_criterio' = 'numericInput'),
+                                   view.cols = c('criterio_calificacion', 'peso_criterio'),
+                                   delete.info.label.cols = c('Criterio', 'Peso Criterio'),
+                                   show.copy = FALSE, 
+                                   title.delete = "Eliminar Criterio",
+                                   title.edit = "Modificar Informacion de Criterio",
+                                   title.add = "Agregar Criterio",
+                                   label.add = "Agregar",
+                                   label.edit = "Modificar",
+                                   label.delete = "Eliminar",
+                                   label.cancel = "Cancelar",
+                                   label.save = "Guardar",
+                                   text.delete.modal = "¿Está seguro de que quiere eliminar este criterio? Sólo se puede eliminar criterios sin registros guardados",
+                                   callback.insert = tbl_criterios_insert_callback,
+                                   callback.delete = tbl_criterios_delete_callback,
+                                   callback.update = tbl_criterios_update_callback,
+                                   icon.add = shiny::icon("plus"),
+                                   icon.delete = shiny::icon("trash"), 
+                                   icon.edit = shiny::icon("edit"),
+                                   datatable.call = function(...) {
+                                       DT::datatable(...) %>%
+                                           formatStyle(
+                                               'criterio_calificacion',
+                                               fontWeight = 'bold'
+                                           )
+                                   },
+                                   datatable.options = list(columns = list(
+                                       list(title = 'Criterio'),
+                                       list(title = 'Peso Criterio')))
+    )
+    
+    # Parametros
+    get_tbl_parametros <- function() {
+        sql_query <- glue_sql(
+            "select *
+            from tbl_parametros",
+            .con = con
+        )
+        res <- dbGetQuery(con, sql_query)
+        return(res)
+    }
+    
+    tbl_parametros_insert_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "INSERT INTO tbl_parametros (nombre_parametro, unidad) VALUES
+                ({data[row,]$nombre_parametro},
+                {data[row,]$unidad})",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_tbl_parametros())
+    }
+    
+    tbl_parametros_delete_callback <- function(data, row) {
+        sql_query <- glue_sql(
+            "DELETE FROM tbl_parametros 
+            WHERE id_parametro = {data[row,]$id_parametro}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_tbl_parametros())
+    }
+    
+    tbl_parametros_update_callback <- function(data, olddata, row) {
+        sql_query <- glue_sql(
+            "UPDATE tbl_parametros SET
+                nombre_parametro = {data[row,]$nombre_parametro},
+                unidad = {data[row,]$unidad}
+            WHERE id_parametro = {data[row,]$id_parametro}",
+            .con = con
+        )
+        
+        tryCatch(
+            {
+                dbSendQuery(con, sql_query)
+            },
+            error = function(cond) {
+                stop(paste(cond))
+            }
+        )
+        return(get_tbl_parametros())
+    }
+    
+    tbl_parametros_mod <- get_tbl_parametros()
+    
+    tbl_parametros_result <- dtedit(input, output,
+                                   name = 'tbl_parametros',
+                                   thedata = tbl_parametros_mod,
+                                   edit.cols = c('nombre_parametro', 'unidad'),
+                                   edit.label.cols = c('Parámetro', 'Unidad'),
+                                   input.types = c('unidad' = 'selectInput'),
+                                   input.choices = list('unidad' = enum$valor[enum$variable == 'unidades']),
+                                   view.cols = c('nombre_parametro', 'unidad'),
+                                   delete.info.label.cols = c('Parámetro', 'Unidad'),
+                                   show.copy = FALSE, 
+                                   title.delete = "Eliminar Parámetro",
+                                   title.edit = "Modificar Informacion de Parámetro",
+                                   title.add = "Agregar Parámetro",
+                                   label.add = "Agregar",
+                                   label.edit = "Modificar",
+                                   label.delete = "Eliminar",
+                                   label.cancel = "Cancelar",
+                                   label.save = "Guardar",
+                                   text.delete.modal = "¿Está seguro de que quiere eliminar este parámetro? Sólo se puede eliminar parámetros sin registros guardados",
+                                   callback.insert = tbl_parametros_insert_callback,
+                                   callback.delete = tbl_parametros_delete_callback,
+                                   callback.update = tbl_parametros_update_callback,
+                                   icon.add = shiny::icon("plus"),
+                                   icon.delete = shiny::icon("trash"), 
+                                   icon.edit = shiny::icon("edit"),
+                                   datatable.call = function(...) {
+                                       DT::datatable(...) %>%
+                                           formatStyle(
+                                               'nombre_parametro',
+                                               fontWeight = 'bold'
+                                           )
+                                   },
+                                   datatable.options = list(columns = list(
+                                       list(title = 'Parámetro'),
+                                       list(title = 'Unidad')))
+    )
 }
 
 onStop(function() {

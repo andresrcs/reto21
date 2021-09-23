@@ -220,3 +220,16 @@ actividades <- tabPanel("Actividades",
                             calendarOutput("calendario_actividades")
                         )
 )
+
+pesos <- tabPanel("Pesos y Parámetros",
+                        fluidPage(
+                            h1("Conceptos"),
+                            uiOutput('tbl_conceptos'),
+                            h1("Hábitos"),
+                            uiOutput('tbl_habitos'),
+                            h1("Criterios de Calificación"),
+                            uiOutput('tbl_criterios'),
+                            h1("Parámetros"),
+                            uiOutput('tbl_parametros')
+                        )
+)
