@@ -1586,7 +1586,9 @@ server <- function(input, output, session) {
                         mutate(archivo = list(to_bin(archivo))) %>%
                         mutate(archivo = archivo %>% 
                                    image_read() %>%
-                                   image_write(tempfile(fileext='.jpg'), format = 'jpg')) %>% 
+                                   image_write(tempfile(fileext='.jpg'),
+                                               format = 'jpg',
+                                               quality = 100)) %>% 
                         pull(archivo)
                 }
                 
@@ -1601,7 +1603,9 @@ server <- function(input, output, session) {
                 tmp <-  image_read(input$upload$datapath) %>%
                     image_resize("300x") %>%
                     image_annotate(format(Sys.time() - hours(5), "%d/%m/%Y %H:%M"), size = 20, gravity = "southwest", color = "red") %>%
-                    image_write(tempfile(fileext='.jpg'), format = 'jpg')
+                    image_write(tempfile(fileext='.jpg'),
+                                format = 'jpg',
+                                quality = 100)
                 
                 list(src = tmp, contentType = "image/jpeg")
             }, deleteFile=FALSE)  
@@ -1812,7 +1816,9 @@ server <- function(input, output, session) {
                 mutate(archivo = list(to_bin(archivo))) %>%
                 mutate(archivo = archivo %>% 
                            image_read() %>%
-                           image_write(path = paste0("www/",tipo,"_",estado,"_",id_participacion,".jpg"), format = 'jpg'),
+                           image_write(path = paste0("www/",tipo,"_",estado,"_",id_participacion,".jpg"),
+                                       format = 'jpg',
+                                       quality = 100),
                        archivo = paste0('<img src=', stringr::str_remove(archivo, "www/"), '></img>')) %>%
                 pivot_wider(names_from = estado, values_from = archivo, id_cols = tipo)
         }, sanitize.text.function = function(x) x)
