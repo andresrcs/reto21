@@ -2007,7 +2007,7 @@ server <- function(input, output, session) {
     {
         if (input$reto_resultados != "" & input$retador_resultados != "") {
             output$resultados_retador <- renderPlot({
-                req(input$reto_resultados)
+                req(input$retador_resultados)
                 consulta_sql<- glue("
                 with cuenta_habitos as (
                 	select
@@ -2103,6 +2103,7 @@ server <- function(input, output, session) {
             
         } else if (input$reto_resultados == "" | input$retador_resultados == "") {
             updateSelectInput(session = session, "retador_resultados", selected = "")
+            output$resultados_retador <- renderPlot({return()})
             output$boton_detalle_retador <- renderUI({return()})
         }
     })
