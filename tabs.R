@@ -41,17 +41,17 @@ resumen <- tabPanel(title = icon("home"),
                     )
 )
 
-retadores <- tabPanel("Retadores",
+retadores <- tabPanel("Directorio",
                       fluidPage(
                           shinyFeedback::useShinyFeedback(),
-                          h1("Registro General de Retadores"),
+                          h1("Directorio de Retadores"),
                           uiOutput('retadores')
                       )
 )
 
-participaciones <- tabPanel("Participaciones",
+participaciones <- tabPanel("Participantes",
                       fluidPage(
-                          h1("Incripción de Participaciones en Retos"),
+                          h1("Incripción de Participantes en Retos"),
                           selectInput('reto_participacion',
                                       "Reto:",
                                       choices = c("", get_retos() %>%
