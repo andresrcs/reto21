@@ -37,6 +37,10 @@ resumen <- tabPanel(title = icon("home"),
                                    )),
                             column(width = 2,
                                    downloadButton("ics_calendario", "Exportar"))
+                        ),
+                        fluidRow(
+                            h3("Indicadores de Participación"),
+                            tableOutput('indicadores')
                         )
                     )
 )

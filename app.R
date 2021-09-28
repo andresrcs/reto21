@@ -283,6 +283,75 @@ server <- function(input, output, session) {
         }
     )
     
+    output$indicadores <- renderTable({
+        consulta_sql <- "
+            with 
+            	habitos as (
+            		select count(*) as num_habitos
+            		from tbl_habitos th
+            	),
+            	actividades as (
+            		select
+            			tr.nombre_reto,
+            			count(*) as num_actividades
+            		from tbl_retos tr
+            			left join tbl_actividades ta on ta.nombre_reto = tr.nombre_reto
+            		where lower(ta.tiempo_actividad)::date <= current_date
+            		group by tr.nombre_reto, tr.reto_activo
+            		having tr.reto_activo = true
+            	),
+            	retadores as (
+            		select 
+            			tr.id_reto,
+            			tp.nombre_reto,
+            			count(nombre_retador) as num_retadores,
+            			least(current_date, upper(tr.duracion_reto)) - lower(tr.duracion_reto) + 1 as num_dias
+            		from
+            			tbl_participacion tp 
+            			inner join tbl_retos tr on tp.nombre_reto = tr.nombre_reto 
+            		group by tr.id_reto, tp.nombre_reto, tr.duracion_reto, tr.reto_activo
+            		having tr.reto_activo = true
+            	),
+            	registro_habitos as (
+            		select 
+            			tp.nombre_reto,
+            			count(*) as cta_habitos
+            		from tbl_registros_habitos trh 
+            			left join tbl_participacion tp on trh.id_participacion = tp.id_participacion
+            			left join tbl_retos tr on tp.nombre_reto = tr.nombre_reto 
+            		group by tp.nombre_reto, reto_activo
+            		having tr.reto_activo = true
+            	),
+            	registro_actividades as (
+            		select 
+            			tp.nombre_reto,
+            			count(*) as cta_actividades
+            		from tbl_registros_actividades tra inner join
+            			tbl_participacion tp on tra.id_participacion = tp.id_participacion
+            			left join tbl_actividades ta on tra.id_actividad = ta.id_actividad
+            			left join tbl_retos tr on tp.nombre_reto = tr.nombre_reto
+            		group by tp.nombre_reto, tr.reto_activo
+            		having tr.reto_activo = true
+            	)
+            select
+            	r.id_reto,
+            	r.nombre_reto as \"Reto\",
+                r.num_retadores as \"Retadores\",
+            	round(cta_habitos / (num_retadores * num_dias * num_habitos)::numeric, 4) as \"Habitos\",
+            	round(cta_actividades / (num_actividades * num_retadores)::numeric, 4) as \"Actividades\"
+            from retadores r 
+            	cross join habitos h
+            	full join actividades a on r.nombre_reto = a.nombre_reto
+            	full join registro_habitos rh on r.nombre_reto = rh.nombre_reto
+            	full join registro_actividades ra on r.nombre_reto = ra.nombre_reto"
+        res <- dbGetQuery(con, consulta_sql) %>%
+            filter(id_reto %in% input$calendarId) %>%
+            mutate(across(c(Habitos, Actividades), .fns = ~ scales::percent(., accuracy = 0.01)),
+                   Retadores = as.integer(Retadores)) %>% 
+            select(-id_reto)
+    })
+    
+    
     # Tab Coaches ##############################################################
     coaches_insert_callback <- function(data, row) {
         data <- data %>% 
