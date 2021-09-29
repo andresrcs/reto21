@@ -1868,6 +1868,7 @@ server <- function(input, output, session) {
             } else if (input$retador_calificacion == "" | input$reto_calificacion == "") {
                 output$edad <- renderText({""})
                 output$objetivo <- renderText({""})
+                output$talla <- renderText({""})
                 output$parametros <- renderTable({return()})
                 output$fotos <- renderTable({return()})
                 return()
