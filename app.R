@@ -337,7 +337,7 @@ server <- function(input, output, session) {
             	r.id_reto,
             	r.nombre_reto as \"Reto\",
                 r.num_retadores as \"Retadores\",
-            	round(cta_habitos / (num_retadores * num_dias * num_habitos)::numeric, 4) as \"Habitos\",
+            	round(cta_habitos / (num_retadores * num_dias * num_habitos)::numeric, 4) as \"Hábitos\",
             	round(cta_actividades / (num_actividades * num_retadores)::numeric, 4) as \"Actividades\"
             from retadores r 
             	cross join habitos h
@@ -346,7 +346,7 @@ server <- function(input, output, session) {
             	full join registro_actividades ra on r.nombre_reto = ra.nombre_reto"
         res <- dbGetQuery(con, consulta_sql) %>%
             filter(id_reto %in% input$calendarId) %>%
-            mutate(across(c(Habitos, Actividades), .fns = ~ scales::percent(., accuracy = 0.01)),
+            mutate(across(c(Hábitos, Actividades), .fns = ~ scales::percent(., accuracy = 0.01)),
                    Retadores = as.integer(Retadores)) %>% 
             select(-id_reto)
     })
@@ -446,7 +446,14 @@ server <- function(input, output, session) {
                             input.choices = list('permiso' = enum$valor[enum$variable == 'permisos_coach']),
                             inputEvent = list(
                                 nombre_coach = function(x, value) {
-                                    if (!str_detect(value, "^.{3,}\\s.{3}")) {
+                                    if (value == '') {
+                                        shinyFeedback::hideFeedback(x)
+                                        shinyFeedback::showFeedbackDanger(
+                                            inputId = x,
+                                            text = "Campo obligatorio"
+                                        )
+                                    } else if (value != '' && !str_detect(value, "^.{3,}\\s.{3}")) {
+                                        shinyFeedback::hideFeedback(x)
                                         shinyFeedback::showFeedbackWarning(
                                             inputId = x,
                                             text = "Nombre inválido, ingrese como mínio un nombre y un apellido"
@@ -456,7 +463,14 @@ server <- function(input, output, session) {
                                     }
                                 },
                                 user_coach = function(x, value) {
-                                    if (!str_detect(value, '^[a-zA-Z0-9!¡/@#$¿?%^&*"\\[\\]\\{\\}<>\\(\\)=\\-_´+`~:;,.€\\|]{4,}$')) {
+                                    if (value == '') {
+                                        shinyFeedback::hideFeedback(x)
+                                        shinyFeedback::showFeedbackDanger(
+                                            inputId = x,
+                                            text = "Campo obligatorio"
+                                        )
+                                    } else if (value != '' && !str_detect(value, '^[a-zA-Z0-9!¡/@#$¿?%^&*"\\[\\]\\{\\}<>\\(\\)=\\-_´+`~:;,.€\\|]{4,}$')) {
+                                        shinyFeedback::hideFeedback(x)
                                         shinyFeedback::showFeedbackWarning(
                                             inputId = x,
                                             text = "El usuario debe contener 4 caracteres como mínimo y no contener espacios"
@@ -466,7 +480,14 @@ server <- function(input, output, session) {
                                     }
                                 },
                                 password = function(x, value) {
-                                    if (!str_detect(value, '^[a-zA-Z0-9!¡/@#$¿?%^&*"\\[\\]\\{\\}<>\\(\\)=\\-_´+`~:;,.€\\|]+$')) {
+                                    if (value == '') {
+                                        shinyFeedback::hideFeedback(x)
+                                        shinyFeedback::showFeedbackDanger(
+                                            inputId = x,
+                                            text = "Campo obligatorio"
+                                        )
+                                    } else if (value != '' && !str_detect(value, '^[a-zA-Z0-9!¡/@#$¿?%^&*"\\[\\]\\{\\}<>\\(\\)=\\-_´+`~:;,.€\\|]+$')) {
+                                        shinyFeedback::hideFeedback(x)
                                         shinyFeedback::showFeedbackWarning(
                                             inputId = x,
                                             text = "El password no puede estar vacio o contener espacios"
@@ -543,7 +564,14 @@ server <- function(input, output, session) {
     
     observeEvent(input$user_coach, {
         value <- input$user_coach
-        if (!str_detect(value, '^[a-zA-Z0-9!¡/@#$¿?%^&*"\\[\\]\\{\\}<>\\(\\)=\\-_´+`~:;,.€\\|]{4,}$')) {
+        if (value == '') {
+            shinyFeedback::hideFeedback("user_coach")
+            shinyFeedback::showFeedbackDanger(
+                inputId = "user_coach",
+                text = "Campo obligatorio"
+            )
+        } else if (value != '' && !str_detect(value, '^[a-zA-Z0-9!¡/@#$¿?%^&*"\\[\\]\\{\\}<>\\(\\)=\\-_´+`~:;,.€\\|]{4,}$')) {
+            shinyFeedback::hideFeedback("user_coach")
             shinyFeedback::showFeedbackWarning(
                 inputId = "user_coach",
                 text = "El usuario debe contener 4 caracteres como mínimo y no contener espacios"
@@ -555,7 +583,13 @@ server <- function(input, output, session) {
     
     observeEvent(input$password, {
         value <- input$password
-        if (!str_detect(value, '^[a-zA-Z0-9!¡/@#$¿?%^&*"\\[\\]\\{\\}<>\\(\\)=\\-_´+`~:;,.€\\|]+$')) {
+        if (value == '') {
+            shinyFeedback::hideFeedback("password")
+            shinyFeedback::showFeedbackDanger(
+                inputId = "password",
+                text = "Campo obligatorio"
+            )
+        } else if (value != '' && !str_detect(value, '^[a-zA-Z0-9!¡/@#$¿?%^&*"\\[\\]\\{\\}<>\\(\\)=\\-_´+`~:;,.€\\|]+$')) {
             shinyFeedback::showFeedbackWarning(
                 inputId = "password",
                 text = "El password no puede estar vacio o contener espacios"
@@ -754,7 +788,14 @@ server <- function(input, output, session) {
                              show.copy = FALSE,
                              inputEvent = list(
                                  nombre_retador = function(x, value) {
-                                     if (!str_detect(value, "^.{3,}\\s.{3}")) {
+                                     if (value == '') {
+                                         shinyFeedback::hideFeedback(x)
+                                         shinyFeedback::showFeedbackDanger(
+                                             inputId = x,
+                                             text = "Campo obligatorio"
+                                         )
+                                     } else if (value != '' && !str_detect(value, "^.{3,}\\s.{3}")) {
+                                         shinyFeedback::hideFeedback(x)
                                          shinyFeedback::showFeedbackWarning(
                                              inputId = x,
                                              text = "Nombre inválido, ingrese como mínio un nombre y un apellido"
@@ -774,7 +815,14 @@ server <- function(input, output, session) {
                                      }
                                  },
                                  num_celular_retador = function(x, value) {
-                                     if (!str_detect(value, '^\\d{9}$')) {
+                                     if (value == '') {
+                                         shinyFeedback::hideFeedback(x)
+                                         shinyFeedback::showFeedbackDanger(
+                                             inputId = x,
+                                             text = "Campo obligatorio"
+                                         )
+                                     } else if (value != '' && !str_detect(value, '^\\d{9}$')) {
+                                         shinyFeedback::hideFeedback(x)
                                          shinyFeedback::showFeedbackWarning(
                                              inputId = x,
                                              text = "Número de celular inválido, el campo debe contener 9 números"
