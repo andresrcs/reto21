@@ -60,7 +60,7 @@ consulta_sql <- glue_sql("
   	lower(ta.tiempo_actividad)::date::varchar as fecha,
   	tra.nombre_coach
   from tbl_registros_actividades tra inner join
-  	tbl_participacion tp on tra.id_participacion = tp.id_participacion inner join
+  	tbl_participacion tp on tra.id_participacion = tp.id_participacion left join
   	tbl_actividades ta on tra.id_actividad = ta.id_actividad 
   where tp.nombre_reto = {params$reto} and tp.nombre_retador = {params$retador}
   order by fecha", .con = con)
