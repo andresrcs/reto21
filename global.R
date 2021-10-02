@@ -179,7 +179,10 @@ get_indicadores <- function(seleccion) {
             			tr.id_reto,
             			tp.nombre_reto,
             			count(nombre_retador) as num_retadores,
-            			least(current_date, upper(tr.duracion_reto)) - lower(tr.duracion_reto) + 1 as num_dias
+            			case 
+            				when current_date < upper(tr.duracion_reto) then current_date - lower(tr.duracion_reto) + 1
+                			else upper(tr.duracion_reto) - lower(tr.duracion_reto)
+                		end num_dias
             		from
             			tbl_participacion tp 
             			inner join tbl_retos tr on tp.nombre_reto = tr.nombre_reto 
