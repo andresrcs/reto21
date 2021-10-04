@@ -146,6 +146,7 @@ calificaciones <- tabPanel("Calificaciones",
                                  h3(textOutput("objetivo")),
                                  h3(textOutput("edad")),
                                  h3(textOutput("talla")),
+                                 h3(textOutput("coach")),
                                  tableOutput("parametros"),
                                  tableOutput("fotos")
                              )

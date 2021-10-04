@@ -1764,6 +1764,18 @@ server <- function(input, output, session) {
         return(res)
     }
     
+    get_coach <- function(retador) {
+        consulta_sql <- glue_sql("
+        select 
+        	nombre_coach
+        from tbl_retadores
+        where nombre_retador = {retador}",
+        .con = con)
+        res <- dbGetQuery(con, consulta_sql) %>% 
+            pull(nombre_coach)
+        return(res)
+    }
+    
     calificaciones_empty_template <- data.frame(
         Criterio = NA_character_,
         Calificación = NA_character_
@@ -1823,6 +1835,7 @@ server <- function(input, output, session) {
                 output$edad <- renderText({""})
                 output$objetivo <- renderText({""})
                 output$talla <- renderText({""})
+                output$coach <- renderText({""})
                 output$parametros <- renderTable({return()})
                 output$fotos <- renderTable({return()})
                 return()
@@ -1860,6 +1873,10 @@ server <- function(input, output, session) {
             paste("Talla:", get_talla(input$retador_calificacion), "m")
         })
         
+        output$coach <- renderText({
+            paste("Coach:", get_coach(input$retador_calificacion))
+        })
+        
         output$parametros <- renderTable({
             parametros_retador <- get_parametros(id_participacion)
             
@@ -1893,7 +1910,17 @@ server <- function(input, output, session) {
                                        format = 'jpg',
                                        quality = 100),
                        archivo = paste0('<img src=', stringr::str_remove(archivo, "www/"), '></img>')) %>%
-                pivot_wider(names_from = estado, values_from = archivo, id_cols = tipo)
+                mutate(id_estado = case_when(
+                        estado == 'Inicial' ~ 1,
+                        estado == 'Final' ~ 2),
+                    id_tipo = case_when(
+                        tipo == 'Frente' ~ 1,
+                        tipo == 'Perfil' ~ 2,
+                        tipo == 'Posterior' ~ 3
+                    )) %>% 
+                arrange(id_estado, id_tipo) %>% 
+                select(-id_estado, -id_tipo, Tipo = tipo) %>% 
+                pivot_wider(names_from = estado, values_from = archivo, id_cols = Tipo)
         }, sanitize.text.function = function(x) x)
     })
     
