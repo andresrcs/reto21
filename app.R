@@ -1885,7 +1885,10 @@ server <- function(input, output, session) {
                 mutate(Parametro = 'IMC',
                        across(where(is.numeric), ~ round(./get_talla(input$retador_calificacion) ^ 2, 2)),
                        Und = '') %>% 
-                bind_rows(parametros_retador)
+                bind_rows(parametros_retador) %>% 
+                mutate(Variacion = Inicial - Final,
+                       `Var %` = scales::percent(Variacion / Inicial, accuracy = 0.01) ) %>% 
+                select(Parametro, Inicial, Final, Variacion, `Var %`, Und)
         })
         
         output$fotos <- renderTable({
