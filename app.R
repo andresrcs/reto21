@@ -1886,7 +1886,7 @@ server <- function(input, output, session) {
                        across(where(is.numeric), ~ round(./get_talla(input$retador_calificacion) ^ 2, 2)),
                        Und = '') %>% 
                 bind_rows(parametros_retador) %>% 
-                mutate(Variacion = Inicial - Final,
+                mutate(Variacion = Final - Inicial,
                        `Var %` = scales::percent(Variacion / Inicial, accuracy = 0.01) ) %>% 
                 select(Parametro, Inicial, Final, Variacion, `Var %`, Und)
         })
