@@ -145,6 +145,11 @@ server <- function(input, output, session) {
                 cal_week_options(
                     startDayOfWeek = 1,
                     daynames = c("Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab")
+                ) %>% 
+                cal_timezone(
+                    timezoneName = "America/Lima",
+                    displayLabel = "GMT-05:00",
+                    tooltip = "Lima"
                 )
         })
         
@@ -188,6 +193,11 @@ server <- function(input, output, session) {
                 cal_week_options(
                     startDayOfWeek = 1,
                     daynames = c("Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab")
+                ) %>% 
+                cal_timezone(
+                    timezoneName = "America/Lima",
+                    displayLabel = "GMT-05:00",
+                    tooltip = "Lima"
                 )
         })
     }
@@ -1664,7 +1674,7 @@ server <- function(input, output, session) {
             output$img <- renderImage({
                 tmp <-  image_read(input$upload$datapath) %>%
                     image_resize("300x") %>%
-                    image_annotate(format(Sys.time() - hours(5), "%d/%m/%Y %H:%M"), size = 20, gravity = "southwest", color = "red") %>%
+                    image_annotate(format(Sys.time(), "%d/%m/%Y %H:%M"), size = 20, gravity = "southwest", color = "red") %>%
                     image_write(tempfile(fileext='.jpg'),
                                 format = 'jpg',
                                 quality = 100)
@@ -1678,7 +1688,7 @@ server <- function(input, output, session) {
         req(input$reto_foto, input$retador_foto, input$tipo, input$estado)
         tmp <-  image_read(input$upload$datapath) %>%
             image_resize("300x") %>% 
-            image_annotate(format(Sys.time() - hours(5), "%d/%m/%Y %H:%M"), size = 20, gravity = "southwest", color = "red") %>%
+            image_annotate(format(Sys.time(), "%d/%m/%Y %H:%M"), size = 20, gravity = "southwest", color = "red") %>%
             image_write(tempfile(fileext='jpg'), format = 'jpg')
         image_raw <- readRaw(file = tmp)
         image_raw <- image_raw$fileRaw
@@ -1997,15 +2007,24 @@ server <- function(input, output, session) {
             
             consulta_sql<- glue("
             with promedio_calificacion as (
+            	with coaches as (
+            		select 
+            			count(nombre_coach) as num_coaches
+            		from
+            			tbl_coaches tc
+            		where tc.permiso != 'Inactivo'
+            	)
             	select
             		concepto,
             		tp.nombre_retador,
             		criterio_calificacion,
-            		avg(calificacion) as prom
+            		sum(calificacion / num_coaches::numeric) as prom
             	from tbl_registros_calificaciones trc inner join
-            		tbl_participacion tp on trc.id_participacion = tp.id_participacion
+            		tbl_participacion tp on trc.id_participacion = tp.id_participacion 
+            		cross join coaches c
             	group by concepto, tp.nombre_reto, tp.nombre_retador, criterio_calificacion
-            	having tp.nombre_reto = '{input$reto_resultados}')
+            	having tp.nombre_reto = '{input$reto_resultados}'
+            )
             select
             	nombre_retador,
             	'Calificacion' as concepto,
@@ -2117,26 +2136,34 @@ server <- function(input, output, session) {
                 
                 consulta_sql<- glue("
                 with promedio_calificacion as (
+                	with coaches as (
+                		select 
+                			count(nombre_coach) as num_coaches
+                		from
+                			tbl_coaches tc
+                		where tc.permiso != 'Inactivo'
+                	)
                 	select
                 		concepto,
                 		tp.nombre_retador,
                 		criterio_calificacion,
                 		upper(tr.duracion_reto) - 1 as fecha_ocurrencia,
-                		avg(calificacion) as prom
+                		sum(calificacion / num_coaches::numeric) as prom
                 	from tbl_registros_calificaciones trc inner join
                 		tbl_participacion tp on trc.id_participacion = tp.id_participacion inner join 
                 		tbl_retos tr on tp.nombre_reto = tr.nombre_reto 
+                		cross join coaches
                 	group by concepto, tp.nombre_reto, tr.duracion_reto, tp.nombre_retador, criterio_calificacion
                 	having tp.nombre_reto = '{input$reto_resultados}' and
                 		tp.nombre_retador = '{input$retador_resultados}')
                 select
                 	'Calificacion' as concepto,
                 	fecha_ocurrencia,
-                	round(sum(prom * peso_criterio)/2 * tc.peso_concepto * 100, 2) as puntaje
+                	sum(prom * peso_criterio)/2 * tc.peso_concepto * 100 as puntaje
                 from promedio_calificacion pc inner join
                 	tbl_criterios_calificacion tcc on pc.criterio_calificacion = tcc.criterio_calificacion inner join
                 	tbl_conceptos tc on pc.concepto = tc.concepto
-                group by nombre_retador, fecha_ocurrencia, tc.peso_concepto;")
+                group by nombre_retador, fecha_ocurrencia, tc.peso_concepto")
                 puntaje_calificaciones <- dbGetQuery(con, consulta_sql)
                 
                 plot_data <- puntaje_habitos %>% 
