@@ -62,12 +62,12 @@ consulta_sql<- glue("
             select
             	tp.nombre_retador,
             	'Actividades' as concepto,
-            	count(id_actividad) / sum(a.tot) * tc.peso_concepto * 100 as puntaje
+            	count(id_actividad) / a.tot::numeric * tc.peso_concepto * 100 as puntaje
             from tbl_registros_actividades tra inner join
             	tbl_participacion tp on tra.id_participacion = tp.id_participacion inner join
             	actividades a on tp.nombre_reto = a.nombre_reto inner join
             	tbl_conceptos tc on tra.concepto = tc.concepto
-            group by tp.nombre_reto, tp.nombre_retador, tc.peso_concepto")
+            group by a.tot, tp.nombre_reto, tp.nombre_retador, tc.peso_concepto")
             puntaje_actividades <- dbGetQuery(con, consulta_sql)
             
             consulta_sql<- glue("
