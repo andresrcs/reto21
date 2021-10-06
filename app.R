@@ -1423,13 +1423,16 @@ server <- function(input, output, session) {
                       skip_existing = TRUE)
             dbxDelete(db,
                       "tbl_registros_habitos",
-                      where = habitos_data_update() %>%
+                      where = {
+                          update_df <- habitos_data_update() %>%
                           filter(!Registro) %>% 
                           rename(nombre_habito = Hábito) %>% 
                           mutate(id_participacion = get_id_participacion(input$reto_habito, input$retador_habito),
-                                 fecha_ocurrencia = input$fecha_habito,
-                                 nombre_coach = credentials()$info$nombre_coach) %>% 
-                          select(id_participacion, fecha_ocurrencia, nombre_habito, nombre_coach))
+                                 fecha_ocurrencia = input$fecha_habito) %>% 
+                          select(id_participacion, fecha_ocurrencia, nombre_habito)
+                          if (credentials()$info$permiso != "Administrador") update_df <- update_df %>% mutate(nombre_coach = credentials()$info$nombre_coach)
+                          update_df
+                          })
             TRUE
         },
         error = function(cond) {
