@@ -1745,11 +1745,13 @@ server <- function(input, output, session) {
         .con = con)
         res <- dbGetQuery(con, consulta_sql) %>% 
             mutate(calificacion = case_when(
-                calificacion == -2 ~ "Mucho Peor",
-                calificacion == -1 ~ "Peor",
+                calificacion == -3 ~ "Mucho Peor",
+                calificacion == -2 ~ "Peor",
+                calificacion == -1 ~ "Ligeramente Peor",
                 calificacion == 0 ~ "Igual",
-                calificacion == 1 ~ "Mejor",
-                calificacion == 2 ~ "Mucho Mejor",
+                calificacion == 1 ~ "Ligeramente Mejor",
+                calificacion == 2 ~ "Mejor",
+                calificacion == 3 ~ "Mucho Mejor",
                 TRUE ~ NA_character_
             )) %>% 
             rename(Calificación = calificacion)
@@ -1793,14 +1795,16 @@ server <- function(input, output, session) {
                                              col_options = list(Calificación = c(NA_character_,
                                                                                  "Mucho Peor",
                                                                                  "Peor",
+                                                                                 "Ligeramente Peor",
                                                                                  "Igual",
+                                                                                 "Ligeramente Mejor",
                                                                                  "Mejor",
                                                                                  "Mucho Mejor")
                                                                 ),
                                              col_edit = FALSE,
                                              row_edit = FALSE,
                                              col_stretch = TRUE,
-                                             height = 200,
+                                             height = 300,
                                              width = 400
     )
     
@@ -1946,11 +1950,13 @@ server <- function(input, output, session) {
                           mutate(id_participacion = current_id,
                                  nombre_coach = credentials()$info$nombre_coach,
                                  calificacion = case_when(
-                                     calificacion == "Mucho Peor" ~ -2,
-                                     calificacion == "Peor" ~ -1,
+                                     calificacion == "Mucho Peor" ~ -3,
+                                     calificacion == "Peor" ~ -2,
+                                     calificacion == "Ligeramente Peor" ~ -1,
                                      calificacion == "Igual" ~ 0,
-                                     calificacion == "Mejor" ~ 1,
-                                     calificacion == "Mucho Mejor" ~ 2,
+                                     calificacion == "Ligeramente Mejor" ~ 1,
+                                     calificacion == "Mejor" ~ 2,
+                                     calificacion == "Mucho Mejor" ~ 3,
                                      TRUE ~ NA_real_
                                  )) %>% 
                           drop_na(calificacion) %>% 
@@ -2062,7 +2068,7 @@ server <- function(input, output, session) {
             select
             	nombre_retador,
             	'Calificacion' as concepto,
-            	sum(prom * peso_criterio)/2 * tc.peso_concepto * 100 as puntaje
+            	sum(prom * peso_criterio)/3 * tc.peso_concepto * 100 as puntaje
             from promedio_calificacion pc inner join
             	tbl_criterios_calificacion tcc on pc.criterio_calificacion = tcc.criterio_calificacion inner join
             	tbl_conceptos tc on pc.concepto = tc.concepto
@@ -2193,7 +2199,7 @@ server <- function(input, output, session) {
                 select
                 	'Calificacion' as concepto,
                 	fecha_ocurrencia,
-                	sum(prom * peso_criterio)/2 * tc.peso_concepto * 100 as puntaje
+                	sum(prom * peso_criterio)/3 * tc.peso_concepto * 100 as puntaje
                 from promedio_calificacion pc inner join
                 	tbl_criterios_calificacion tcc on pc.criterio_calificacion = tcc.criterio_calificacion inner join
                 	tbl_conceptos tc on pc.concepto = tc.concepto

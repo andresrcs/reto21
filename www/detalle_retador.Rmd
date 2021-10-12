@@ -92,11 +92,13 @@ res <- dbGetQuery(con, consulta_sql)
 if (nrow(res) > 0) {
     res %>% 
   mutate(calificacion = case_when(
-                calificacion == -2 ~ "Mucho Peor",
-                calificacion == -1 ~ "Peor",
+                calificacion == -3 ~ "Mucho Peor",
+                calificacion == -2 ~ "Peor",
+                calificacion == -1 ~ "Ligeramente Peor",
                 calificacion == 0 ~ "Igual",
-                calificacion == 1 ~ "Mejor",
-                calificacion == 2 ~ "Mucho Mejor",
+                calificacion == 1 ~ "Ligeramente Mejor",
+                calificacion == 2 ~ "Mejor",
+                calificacion == 3 ~ "Mucho Mejor",
                 TRUE ~ NA_character_
             )) %>% 
   rename(Criterio = criterio_calificacion,
