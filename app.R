@@ -297,11 +297,12 @@ server <- function(input, output, session) {
                 tr.nombre_reto || '-' || actividad || '-' || lower(tiempo_actividad) as \"UID\"
             from tbl_actividades ta inner join tbl_retos tr on ta.nombre_reto = tr.nombre_reto
             where tr.reto_activo = true"
-            res <- dbGetQuery(con, consulta_sql) %>% 
+            dbGetQuery(con, consulta_sql) %>% 
                 filter(id_reto %in% input$calendarId) %>%
-                select(-id_reto)
-            
-            ic_write(ical(res), file)
+                select(-id_reto) %>% 
+                mutate(across(starts_with("DT"), ~ force_tz(., tzone = "America/Lima"))) %>% 
+                ical() %>% 
+                ic_write(file)
         }
     )
     
