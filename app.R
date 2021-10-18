@@ -1870,6 +1870,7 @@ server <- function(input, output, session) {
                 stringr::str_replace_all(c('years?' = "Años",
                                            'mons' = 'Meses',
                                            'mon\\s' = 'Mes ',
+                                           'mon$' = 'Mes',
                                            'days' = 'Días',
                                            'day\\s' = 'Día'))
             paste("Edad:", edad)
