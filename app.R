@@ -1155,10 +1155,7 @@ server <- function(input, output, session) {
                    stringsAsFactors=FALSE)
     ) 
     
-    nombre_retador.Types <- reactiveVal(
-            get_retadores() %>%
-                pull(nombre_retador)
-    )
+    nombre_retador.Types <- reactiveVal()
     
     tbl_participaciones(get_participaciones(reto = isolate(input$reto_participacion)))
     
@@ -1206,6 +1203,7 @@ server <- function(input, output, session) {
     
     observeEvent(input$reto_participacion, {
         tbl_participaciones(get_participaciones(reto = input$reto_participacion))
+        update_listas_retadores()
     })
     # Tab Parametros ###########################################################
     get_parametros <- function (id_participacion) {
