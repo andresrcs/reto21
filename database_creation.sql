@@ -403,7 +403,7 @@ create or replace function check_date_range_actividad()
 		from tbl_retos tr
 		where tr.nombre_reto = new.nombre_reto;
 		
-		if not (new.tiempo_actividad <@ duracion::varchar::tsrange) then 
+		if not (new.tiempo_actividad <@ duracion::varchar::tsrange) and (new.actividad != 'Ceremonia'::tipo_actividad) then 
 			raise exception 'Cronograma % fuera de rango %',
 			new.tiempo_actividad,
 			duracion;
