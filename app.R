@@ -1894,7 +1894,7 @@ server <- function(input, output, session) {
                        Und = '') %>% 
                 bind_rows(parametros_retador) %>% 
                 mutate(Variacion = Final - Inicial,
-                       `Var %` = scales::percent(Variacion / Inicial, accuracy = 0.01) ) %>% 
+                       `Var %` = percent(Variacion / Inicial, accuracy = 0.01) ) %>% 
                 select(Parametro, Inicial, Final, Variacion, `Var %`, Und)
         })
         
@@ -2083,7 +2083,7 @@ server <- function(input, output, session) {
                 ungroup() %>% 
                 ggplot(aes(x = puntaje, y = reorder(nombre_retador, total), fill = concepto)) +
                 geom_col(position = "stack") +
-                geom_text(aes(label = round(total, 2), x = total), hjust = -0.5) +
+                geom_text(aes(label = number(total, accuracy = 0.01), x = total), hjust = -0.5) +
                 scale_x_continuous(limits = c(0,100), expand = expansion(add = c(0, 10))) +
                 coord_cartesian(clip = "off") +
                 labs(title = "Puntaje por Retador",
@@ -2216,10 +2216,10 @@ server <- function(input, output, session) {
                 plot_data %>% 
                     ggplot(aes(x = fecha_ocurrencia, y = puntaje, fill = concepto)) +
                     geom_col(position = "stack", width = 0.9) +
-                    geom_text(aes(label = round(total, 2), y = total), vjust = -0.5) +
+                    geom_text(aes(label = number(total, accuracy = 0.01), y = total), vjust = -0.5) +
                     coord_cartesian(clip = "off") +
                     scale_x_date(date_breaks = "1 day",
-                                 labels = scales::label_date_short(),
+                                 labels = label_date_short(),
                                  expand = c(0.005,0.005)) +
                     labs(title = glue("Puntaje de {input$retador_resultados} por Fecha"),
                          x = "Fecha",

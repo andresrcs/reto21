@@ -114,7 +114,7 @@ consulta_sql<- glue("
             puntajes %>% 
                 ggplot(aes(x = Puntaje, y = reorder(Retador, Total), fill = Concepto)) +
                 geom_col(position = "stack") +
-                geom_text(aes(label = round(Total, 2), x = Total), hjust = -0.5) +
+                geom_text(aes(label = number(Total, accuracy = 0.01), x = Total), hjust = -0.5) +
                 scale_x_continuous(limits = c(0,100), expand = expansion(add = c(0, 10))) +
                 coord_cartesian(clip = "off") +
                 labs(title = "Puntaje por Retador",
