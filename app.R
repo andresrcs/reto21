@@ -1554,12 +1554,15 @@ server <- function(input, output, session) {
                       skip_existing = TRUE)
             dbxDelete(db,
                       "tbl_registros_actividades",
-                      where = actividades_data_update() %>%
+                      where =  {
+                          update_df <- actividades_data_update() %>%
                           filter(!Registro) %>% 
                           rename(id_participacion = id) %>%  
-                          mutate(id_actividad = input$id_actividad,
-                                 nombre_coach = credentials()$info$nombre_coach) %>% 
-                          select(id_participacion, id_actividad, nombre_coach))
+                          mutate(id_actividad = input$id_actividad) %>% 
+                          select(id_participacion, id_actividad)
+                          if (credentials()$info$permiso != "Administrador") update_df <- update_df %>% mutate(nombre_coach = credentials()$info$nombre_coach)
+                          update_df
+                          })
             TRUE
         },
         error = function(cond) {
