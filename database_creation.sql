@@ -1,4 +1,6 @@
-CREATE EXTENSION btree_gist
+-- !preview conn=con
+
+CREATE EXTENSION btree_gist;
 
 CREATE SCHEMA IF NOT EXISTS reto21 AUTHORIZATION ubuntu;
 SET search_path TO reto21;
@@ -43,7 +45,7 @@ create trigger trig_01_tbl_coaches_check_email_notification
 	check_email_notification();
 
 insert into tbl_coaches (nombre_coach, user_coach, password, permiso)
-	values ('Administrador', 'admin', '$7$C6..../....l094n9rNQTy1e4.xwl5RP1wPENQZFBobdlL4P6p11s/$DRD2H72lcjNGJlStZb7HtwAYRLay5EdtJOGdQZXaQG5', 'Administrador');
+	values ('Administrador Inicial', 'admin', '$7$C6..../....l094n9rNQTy1e4.xwl5RP1wPENQZFBobdlL4P6p11s/$DRD2H72lcjNGJlStZb7HtwAYRLay5EdtJOGdQZXaQG5', 'Administrador');
 	
 -- Crear tbl_retadores
 create type sexos as enum
